@@ -469,7 +469,10 @@ const NO_RELAY_MSG='你是直接打开的网页文件,没有中转服务。<br>'
 
 /* ---------- 3. 数据源 ---------- */
 class Source{ constructor(){ this.onPartial=this.onFinal=this.onState=()=>{}; }
-  start(){} sendAudio(){} stop(){} get needMic(){ return true; } }
+  start(){} sendAudio(){} stop(){} get needMic(){ return true; }
+  // 真实链路靠停送音频来"暂停",数据源本身不用管;演示模式没有麦克风,
+  // 必须自己停,否则点了暂停字幕还在往外冒。
+  pause(){} resume(){} }
 
 const DEMO=[
   ["Good morning everyone, thanks for joining today's session.","大家早上好,感谢各位参加今天的分享。"],
@@ -482,23 +485,28 @@ const DEMO=[
 class DemoSource extends Source{
   get needMic(){ return false; }
   start(){ this.i=0; this.onState('running'); this.next(); }
+  // 每个续排点都要重新判一次:光靠 pause() 里的 clearTimeout 不够 ——
+  // 如果暂停正好卡在回调执行到一半,回调结尾又会排一个新定时器,清不掉。
+  get stopped(){ return this.dead || this.held; }
   next(){
-    if(this.dead) return;
+    if(this.stopped) return;
     const [en,zh]=DEMO[this.i++%DEMO.length], w=en.split(' ');
     let k=0;
     const tick=()=>{
-      if(this.dead) return;
+      if(this.stopped) return;
       k++;
       const r=k/w.length;
       // 中文不跟着每个词跳,等英文积累到一定比例才推进,避免下半屏闪烁
       const dst = r<0.45 ? '' : zh.slice(0, Math.floor(zh.length*Math.min(1,(r-0.2)/0.75)));
       this.onPartial({src:w.slice(0,k).join(' '), dst});
       this.t = k<w.length ? setTimeout(tick,130+Math.random()*130)
-        : setTimeout(()=>{ if(this.dead)return; this.onFinal({src:en,dst:zh});
-            this.t=setTimeout(()=>this.next(),500+Math.random()*700); },420);
+        : setTimeout(()=>{ if(this.stopped) return; this.onFinal({src:en,dst:zh});
+            this.t=setTimeout(()=>{ if(this.stopped) return; this.next(); },500+Math.random()*700); },420);
     };
     this.t=setTimeout(tick,300);
   }
+  pause(){ this.held=true; clearTimeout(this.t); }
+  resume(){ if(!this.held) return; this.held=false; this.next(); }   // 从下一句接着演
   stop(){ this.dead=true; clearTimeout(this.t); this.onState('closed'); }
 }
 
@@ -695,8 +703,10 @@ async function start(){
   hideToast(); syncRun(); render();
   clearInterval(S.timer); S.timer=setInterval(setMeta,250); setMeta();
 }
-function pause(){ S.paused=true; mic&&mic.pause(); showToast('收音已暂停,点击重试'); syncRun(); setMeta(); }
-function resume(){ if(!S.running) return start(); S.paused=false; mic&&mic.resume(); hideToast(); syncRun(); setMeta(); }
+function pause(){ S.paused=true; mic&&mic.pause(); source&&source.pause();
+  showToast('收音已暂停,点击重试'); syncRun(); setMeta(); }
+function resume(){ if(!S.running) return start(); S.paused=false; mic&&mic.resume(); source&&source.resume();
+  hideToast(); syncRun(); setMeta(); }
 function stopAll(){
   S.running=false; S.paused=false; S.reconnecting=false; clearInterval(S.timer);
   try{source&&source.stop()}catch(e){} try{mic&&mic.stop()}catch(e){}
