@@ -453,6 +453,9 @@ const cfg = Object.assign({
   arkKey:'', arkModel:'doubao-seed-1-6-flash-250828', arkBase:EP.ark,
   relay:'', endSil:800
 }, (()=>{ try{ return JSON.parse(localStorage.getItem(CFG_KEY)||'{}'); }catch(e){ return {}; } })());
+// 第一次打开(还没存过配置)时自动弹设置面板。
+// 否则默认是演示模式,用户点了开始看到一堆假字幕,还以为部署坏了。
+const FIRST_RUN = (()=>{ try{ return !localStorage.getItem(CFG_KEY); }catch(e){ return false; } })();
 const saveCfg=()=>{ try{ localStorage.setItem(CFG_KEY,JSON.stringify(cfg)); }catch(e){} };
 // 直接双击打开 html 时协议是 file:,location.host 为空,
 // 拼出来会是 ws:///asr 这种无效地址,所以要单独判掉。
@@ -638,12 +641,17 @@ function flash(m){ showToast(m); tmpT=setTimeout(()=>{
   else if(S.paused) showToast('收音已暂停,点击重试');
   else hideToast(); },2200); }
 
+// 演示模式高亮成琥珀色 —— 灰扑扑的一行"演示数据"太容易被忽略,
+// 用户会以为出的字幕是自己说的话。
+const tag=()=> cfg.provider==='demo'
+  ? '<b style="color:#D9A441;font-weight:600">演示数据(未配置密钥)</b>'
+  : PROVIDER_NAME[cfg.provider];
 function setMeta(){
-  if(!S.running){ meta.textContent = S.history.length?'已停止':('未开始 · '+PROVIDER_NAME[cfg.provider]); return; }
+  if(!S.running){ meta.innerHTML = S.history.length?'已停止':('未开始 · '+tag()); return; }
   const t=Math.floor((Date.now()-S.t0)/1000);
-  meta.textContent=(S.paused?'已暂停 ':'已进行 ')
+  meta.innerHTML=(S.paused?'已暂停 ':'已进行 ')
     +String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')
-    +' · '+PROVIDER_NAME[cfg.provider]
+    +' · '+tag()
     +(S.reconnecting?' · 重连中…':'');
 }
 
@@ -919,6 +927,14 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 fillForm(); syncRun(); setMeta(); render();
+
+// 第一次打开直接把设置摊开,并说清楚不配就是演示数据
+if(FIRST_RUN && !FILE_MODE){
+  $('btnSet').click();
+  setProbe('wait','先选识别服务并填入密钥,否则「开始」出来的是演示数据,不是你说的话。'
+    + '填完点「测试连接」确认能通,再回去点开始。');
+}
+
 console.log('%c同传前端就绪','color:#2AC3F2;font-weight:bold');
 console.log('当前服务:',PROVIDER_NAME[cfg.provider],'· 中转:',relayURL());
 </script>
