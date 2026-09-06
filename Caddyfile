@@ -1,0 +1,4 @@
+# Caddy 会自动申请并续期 Let's Encrypt 证书,WebSocket 无需额外配置
+si.你的域名.com {
+    reverse_proxy 127.0.0.1:8787
+}

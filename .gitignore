@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+.env
+.env.local
+.vercel
+*.log
+cert.pem
+key.pem
+.DS_Store

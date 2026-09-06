@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>同声传译 · 英译中</title>
+<style>
+  :root{
+    --src-bg:#000; --dst-top:#0D2A33; --dst-bot:#06171D;
+    --label:#5E6E73; --label-dst:#5D797F;
+    --text:#fff; --interim:#8A979C; --accent:#2AC3F2; --dock-fg:#93A6AB;
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:#000;color:var(--text);overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+  #app{height:100vh;height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden}
+
+  .pane{position:relative;flex:1 1 50%;min-height:0;display:flex;flex-direction:column;
+        padding:0 clamp(16px,5vw,34px);overflow:hidden}
+  .pane--src{background:var(--src-bg);padding-top:clamp(40px,10vw,58px)}
+  .pane--dst{background:linear-gradient(180deg,var(--dst-top) 0%,var(--dst-bot) 100%);padding-top:clamp(18px,4.5vw,26px)}
+  body.mono .pane--src{display:none}
+  body.mono .pane--dst{flex:1 1 100%;padding-top:clamp(40px,10vw,58px)}
+
+  .meta{position:absolute;top:clamp(10px,2.6vw,16px);left:0;right:0;text-align:center;
+        font-size:clamp(12px,3.2vw,15px);color:#474C4F;pointer-events:none;z-index:2;
+        font-variant-numeric:tabular-nums;padding:0 12px}
+
+  .pane__head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px}
+  .pane__label{font-size:clamp(13px,3.4vw,16px);color:var(--label);letter-spacing:.04em;flex:none}
+  .pane--dst .pane__label{color:var(--label-dst)}
+  .head-right{display:flex;align-items:center;gap:clamp(8px,2.4vw,14px)}
+  canvas.meter{width:clamp(36px,9vw,56px);height:clamp(15px,3.8vw,22px);display:block;opacity:.9}
+  .lang{display:inline-flex;align-items:center;gap:7px;background:none;color:#fff;cursor:pointer;
+        border:1px solid rgba(255,255,255,.2);border-radius:999px;
+        padding:clamp(6px,1.7vw,10px) clamp(12px,3.2vw,18px);
+        font-size:clamp(14px,3.8vw,18px);font-family:inherit;white-space:nowrap}
+  .gear{background:none;border:0;padding:6px;cursor:pointer;color:#6D7C81;display:flex}
+  .gear svg{width:clamp(20px,5vw,24px);height:clamp(20px,5vw,24px);stroke:currentColor;fill:none;stroke-width:1.6}
+
+  .pane__body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+              padding:clamp(6px,1.8vw,12px) 0 clamp(96px,22vw,132px);scrollbar-width:none}
+  .pane__body::-webkit-scrollbar{display:none}
+  .pane--src .pane__body{padding-bottom:clamp(12px,3vw,20px)}
+  .line{margin:0 0 .5em;font-size:clamp(21px,5.6vw,32px);line-height:1.42;word-break:break-word}
+  .line--interim{color:var(--interim)}
+  .line:last-child{margin-bottom:0}
+  .empty{color:#3A4245;font-size:clamp(15px,4vw,19px);line-height:1.6}
+
+  .toast{position:absolute;left:50%;top:50%;z-index:6;border:0;cursor:pointer;font-family:inherit;
+         transform:translate(-50%,-50%) scale(.95);background:var(--accent);color:#fff;
+         border-radius:18px;padding:clamp(14px,3.6vw,20px) clamp(22px,6vw,44px);
+         font-size:clamp(15px,4.2vw,24px);box-shadow:0 12px 34px rgba(0,0,0,.45);
+         /* 绝对定位 + left:50% 时,shrink-to-fit 的可用宽度只剩容器的一半,
+            会莫名其妙地折行。用 max-content 显式取内容宽度再封顶。 */
+         width:max-content;max-width:min(86%,430px);
+         line-height:1.4;opacity:0;pointer-events:none;
+         transition:opacity .18s ease,transform .18s ease}
+  .toast.is-show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+
+  .dock{position:fixed;left:50%;bottom:calc(clamp(14px,4.5vw,30px) + var(--safe-b));transform:translateX(-50%);
+        width:min(90%,660px);display:flex;z-index:5;overflow:hidden;
+        background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.075);
+        border-radius:22px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .dock__grp{display:flex;flex:1 1 0}
+  .dock__grp+.dock__grp{flex:3 1 0;border-left:1px solid rgba(255,255,255,.09)}
+  .dock__btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+             padding:clamp(10px,2.8vw,15px) 3px;background:none;border:0;cursor:pointer;
+             color:var(--dock-fg);font-size:clamp(11px,2.9vw,14px);font-family:inherit;transition:color .15s}
+  .dock__btn svg{width:clamp(23px,5.8vw,29px);height:clamp(23px,5.8vw,29px);
+                 stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .dock__btn.is-on{color:var(--accent)}
+  .dock__btn:disabled{opacity:.32;cursor:default}
+  .biTxt{font-size:8.6px;stroke:none;fill:currentColor;letter-spacing:-.2px}
+
+  /* 设置 / 记录 —— 共用的全屏面板 */
+  .sheet{position:absolute;inset:0;z-index:10;background:#050F13;display:none;flex-direction:column;
+         padding:calc(clamp(18px,5vw,34px) + env(safe-area-inset-top,0px)) clamp(18px,5vw,34px)
+                 calc(clamp(18px,5vw,34px) + var(--safe-b))}
+  .sheet.is-show{display:flex}
+  .sheet__bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+  .sheet__title{font-size:clamp(17px,4.4vw,21px)}
+  .sheet__acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#dfe9ec;
+       border-radius:10px;padding:9px 15px;font-size:14px;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .btn--p{background:var(--accent);border-color:var(--accent);color:#04222c;font-weight:600}
+  .sheet__body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+  .fld{margin-bottom:15px}
+  .fld>label{display:block;font-size:13px;color:#7E9198;margin-bottom:6px}
+  .fld input,.fld select{width:100%;background:#0C1E25;border:1px solid rgba(255,255,255,.13);color:#fff;
+    border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;outline:none;appearance:none}
+  .fld input:focus,.fld select:focus{border-color:var(--accent)}
+  .fld select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237E9198' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat:no-repeat;background-position:right 12px center;background-size:16px;padding-right:38px}
+  .fld .hint{font-size:12px;color:#5E7178;margin-top:6px;line-height:1.55}
+  .fld .hint a{color:#3FA9CC}
+  .grp{border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:15px 15px 2px;margin-bottom:16px}
+  .grp>h4{margin:0 0 13px;font-size:13px;color:var(--accent);font-weight:600;letter-spacing:.05em}
+  .grp[hidden]{display:none}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px}
+  .chip{background:rgba(42,195,242,.1);border:1px solid rgba(42,195,242,.3);color:#7FD4EE;
+        border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .chip:active{background:rgba(42,195,242,.24)}
+  [hidden]{display:none !important}
+  .probe{font-size:12.5px;line-height:1.6;margin:-6px 0 16px;padding:9px 12px;border-radius:9px;display:none}
+  .probe.ok{display:block;background:rgba(46,190,120,.12);border:1px solid rgba(46,190,120,.35);color:#7BD6A6}
+  .probe.bad{display:block;background:rgba(240,90,90,.1);border:1px solid rgba(240,90,90,.32);color:#F0A0A0}
+  .probe.wait{display:block;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#93A6AB}
+  .note{font-size:12.5px;color:#5E7178;line-height:1.7;border-left:2px solid rgba(42,195,242,.35);
+        padding-left:12px;margin:4px 0 18px}
+
+  .rec{padding:13px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .rec b{display:block;font-weight:400;color:#93A6AB;font-size:clamp(14px,3.6vw,16px);margin-bottom:5px}
+  .rec span{display:block;font-size:clamp(16px,4.2vw,19px);line-height:1.5}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <section class="pane pane--src">
+    <div class="meta" id="meta">未开始</div>
+    <div class="pane__head">
+      <span class="pane__label">识别文本</span>
+      <div class="head-right">
+        <canvas class="meter" id="meter" width="112" height="44"></canvas>
+        <button class="lang" id="langBtn">英 <span style="opacity:.6">&#8594;</span> 中</button>
+        <button class="gear" id="btnSet" aria-label="设置">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="pane__body" id="srcBody"></div>
+  </section>
+
+  <section class="pane pane--dst">
+    <div class="pane__head"><span class="pane__label">翻译文本</span></div>
+    <div class="pane__body" id="dstBody"></div>
+  </section>
+
+  <button class="toast" id="toast">收音已暂停,点击重试</button>
+
+  <div class="dock">
+    <div class="dock__grp">
+      <button class="dock__btn" id="btnPip">
+        <svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><rect x="12" y="11.5" width="8" height="6.5" rx="1.5"/><polyline points="9 11 5 7"/><polyline points="5 7 8.5 7"/><polyline points="5 7 5 10.5"/></svg>
+        开启浮窗
+      </button>
+    </div>
+    <div class="dock__grp">
+      <button class="dock__btn" id="btnRun">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2"/><path id="runIcon" d="M10 8.2 L16.4 12 L10 15.8 Z" fill="currentColor" stroke="none"/></svg>
+        <span id="runLabel">开始</span>
+      </button>
+      <button class="dock__btn is-on" id="btnBi">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4.6" width="18" height="14.8" rx="3"/><text class="biTxt" x="12" y="15" text-anchor="middle">双语</text></svg>
+        双语
+      </button>
+      <button class="dock__btn" id="btnClear">
+        <svg viewBox="0 0 24 24"><polyline points="4 6.6 20 6.6"/><path d="M9.2 6.6V4.8h5.6v1.8"/><path d="M6.4 6.6l1 12.1a1.6 1.6 0 0 0 1.6 1.5h6a1.6 1.6 0 0 0 1.6-1.5l1-12.1"/><path d="M10.3 10.4v6M13.7 10.4v6"/></svg>
+        <span id="clearLabel">清空</span>
+      </button>
+      <button class="dock__btn" id="btnDone">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.2"/><polyline points="8 12.3 11 15.2 16.2 9.4"/></svg>
+        完成
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== 设置 ===== -->
+  <div class="sheet" id="setSheet">
+    <div class="sheet__bar">
+      <span class="sheet__title">设置</span>
+      <div class="sheet__acts">
+        <button class="btn" id="setClear">清空密钥</button>
+        <button class="btn" id="setProbe">测试连接</button>
+        <button class="btn btn--p" id="setSave">保存</button>
+      </div>
+    </div>
+    <div class="sheet__body">
+      <div class="probe" id="probeMsg"></div>
+
+      <div class="fld">
+        <label>识别服务</label>
+        <select id="provider">
+          <option value="demo">演示模式(不联网,先看效果)</option>
+          <option value="aliyun">阿里云百炼 Gummy · 识别+翻译一步到位</option>
+          <option value="volc">火山引擎 大模型流式识别 + 豆包翻译</option>
+        </select>
+        <p class="hint">阿里云那条链路里翻译是模型自带的,延迟最低;火山这条是先识别、再让豆包翻,可控性更高。</p>
+      </div>
+
+      <p class="note">
+        密钥只存在这台设备的浏览器里(localStorage),开始收音时通过 WSS 发给你自己部署的中转服务,不会存到别处。<br>
+        中转服务是必须的 —— 两家的流式接口都用自定义 HTTP Header 鉴权,而浏览器的 WebSocket 不允许设 Header,前端直连在协议层就走不通。
+      </p>
+
+      <div class="grp" id="grpAli" hidden>
+        <h4>阿里云百炼</h4>
+        <div class="fld">
+          <label>API Key</label>
+          <input id="aliKey" type="password" autocomplete="off" placeholder="sk-xxxxxxxxxxxxxxxx">
+          <p class="hint">百炼控制台 → API-KEY 创建。<b>地域、Key、模型列表三者绑定,不能跨地域混用</b> —— 新加坡的 Key 打北京域名一定 401。</p>
+        </div>
+
+        <div class="fld">
+          <label>接入地址(WebSocket)</label>
+          <div class="chips">
+            <button type="button" class="chip" data-fill="aliEp" data-v="wss://dashscope.aliyuncs.com/api-ws/v1/inference">北京通用域名</button>
+            <button type="button" class="chip" data-fill="aliEp" data-v="wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference">新加坡通用域名</button>
+          </div>
+          <input id="aliEp" type="text" autocomplete="off" spellcheck="false" placeholder="wss://dashscope.aliyuncs.com/api-ws/v1/inference">
+          <p class="hint">用业务空间专属域名的话,把控制台「API Host」那一串直接粘进来即可,会自动补成
+            <code>wss://</code> 和 <code>/api-ws/v1/inference</code>。<br>
+            例:<code>ws-xxxxxx.ap-southeast-1.maas.aliyuncs.com</code></p>
+        </div>
+
+        <div class="fld">
+          <label>识别模型</label>
+          <div class="chips">
+            <button type="button" class="chip" data-fill="aliModel" data-v="gummy-realtime-v1">gummy-realtime-v1</button>
+            <button type="button" class="chip" data-fill="aliModel" data-v="qwen-audio-3.0-asr-flash-streaming">qwen-audio-3.0-asr-flash-streaming</button>
+          </div>
+          <input id="aliModel" type="text" autocomplete="off" spellcheck="false" placeholder="gummy-realtime-v1">
+          <p class="hint"><b>Gummy 只在北京地域提供</b>,它识别+翻译一步到位,0.00015 元/秒(约 0.54 元/小时)。<br>
+            新加坡等地域没有 Gummy,用 qwen-audio 系列做识别,翻译方式改成下面那一项。</p>
+        </div>
+
+        <div class="fld">
+          <label>翻译方式</label>
+          <select id="aliMode">
+            <option value="model">模型自带翻译(Gummy · 延迟最低)</option>
+            <option value="llm">识别后用大模型翻译(其它地域用这个)</option>
+          </select>
+        </div>
+
+        <div id="aliLLM" hidden>
+          <div class="fld">
+            <label>翻译模型</label>
+            <input id="aliLLMModel" type="text" autocomplete="off" spellcheck="false" placeholder="qwen-flash">
+            <p class="hint">用同一个 API Key,走百炼的 OpenAI 兼容接口。选 flash 类小模型延迟最低。</p>
+          </div>
+          <div class="fld">
+            <label>大模型接入地址(HTTP)</label>
+            <div class="chips">
+              <button type="button" class="chip" data-fill="aliLLMBase" data-v="https://dashscope.aliyuncs.com/compatible-mode/v1">北京</button>
+              <button type="button" class="chip" data-fill="aliLLMBase" data-v="https://dashscope-intl.aliyuncs.com/compatible-mode/v1">新加坡</button>
+            </div>
+            <input id="aliLLMBase" type="text" autocomplete="off" spellcheck="false" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
+            <p class="hint">专属域名是另一个主机名(<code>llm-xxxx</code> 开头),不是上面那个 <code>ws-xxxx</code>,在控制台同一页能找到。</p>
+          </div>
+        </div>
+
+        <div class="fld">
+          <label>热词表 ID(可选)</label>
+          <input id="aliVocab" type="text" autocomplete="off" placeholder="留空即可">
+          <p class="hint">有专业术语、人名、产品名时建议配,识别准确率提升很明显。</p>
+        </div>
+      </div>
+
+      <div class="grp" id="grpVolc" hidden>
+        <h4>火山引擎 · 语音技术(识别)</h4>
+        <div class="fld">
+          <label>App ID</label>
+          <input id="vcApp" type="text" autocomplete="off" placeholder="语音技术控制台的 APP ID">
+        </div>
+        <div class="fld">
+          <label>Access Token</label>
+          <input id="vcTok" type="password" autocomplete="off" placeholder="Access Token">
+        </div>
+        <div class="fld">
+          <label>Resource ID</label>
+          <select id="vcRes">
+            <option value="volc.bigasr.sauc.duration">volc.bigasr.sauc.duration(时长版)</option>
+            <option value="volc.bigasr.sauc.concurrent">volc.bigasr.sauc.concurrent(并发版)</option>
+          </select>
+          <p class="hint">按你在控制台开通的计费方式选,选错会直接报鉴权失败。</p>
+        </div>
+        <div class="fld">
+          <label>接入地址(WebSocket)</label>
+          <div class="chips">
+            <button type="button" class="chip" data-fill="vcEp" data-v="wss://openspeech.bytedance.com/api/v3/sauc/bigmodel">大模型流式识别</button>
+          </div>
+          <input id="vcEp" type="text" autocomplete="off" spellcheck="false" placeholder="wss://openspeech.bytedance.com/api/v3/sauc/bigmodel">
+        </div>
+        <div class="fld">
+          <label>识别语种</label>
+          <input id="vcLang" type="text" autocomplete="off" placeholder="en-US">
+          <p class="hint">默认 en-US。若返回参数错误,换成 <code>en</code> 再试。</p>
+        </div>
+
+        <h4 style="margin-top:6px">火山方舟 · 豆包(翻译)</h4>
+        <div class="fld">
+          <label>方舟 API Key</label>
+          <input id="arkKey" type="password" autocomplete="off" placeholder="方舟控制台的 API Key">
+        </div>
+        <div class="fld">
+          <label>模型 / 推理接入点</label>
+          <input id="arkModel" type="text" autocomplete="off" placeholder="doubao-seed-1-6-flash-250828">
+          <p class="hint">填模型 ID 或你自己创建的推理接入点 ep-xxxx。翻译走的是方舟 OpenAI 兼容接口,建议选 flash 类小模型,延迟最低。</p>
+        </div>
+        <div class="fld">
+          <label>方舟接入地址(HTTP)</label>
+          <input id="arkBase" type="text" autocomplete="off" spellcheck="false" placeholder="https://ark.cn-beijing.volces.com/api/v3">
+        </div>
+      </div>
+
+      <div class="fld">
+        <label>中转服务地址</label>
+        <div class="chips">
+          <button type="button" class="chip" data-fill="relay" data-v="ws://localhost:8787/api/asr">本机 localhost:8787</button>
+          <button type="button" class="chip" data-fill="relay" data-v="">留空(用同源)</button>
+        </div>
+        <input id="relay" type="text" autocomplete="off" spellcheck="false" placeholder="留空 = 用当前网页所在的服务器">
+        <p class="hint">正常情况留空最省事:网页和中转是同一个 Node 服务,自动用同源地址。<br>
+          只有在两种情况下要手填 —— 直接双击打开 html 文件时(填本机那个),或者网页和中转分开部署时(例如 wss://si.example.com/asr)。</p>
+      </div>
+
+      <div class="fld">
+        <label>断句静音阈值(毫秒)</label>
+        <input id="endSil" type="number" min="200" max="3000" step="100" placeholder="800">
+        <p class="hint">说话人停顿超过这个时长就把当前句定稿。调小出字更碎更快,调大更完整但延迟高。</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 记录 ===== -->
+  <div class="sheet" id="recSheet">
+    <div class="sheet__bar">
+      <span class="sheet__title">本次记录 <span id="recCount" style="color:#93A6AB;font-size:14px"></span></span>
+      <div class="sheet__acts">
+        <button class="btn" id="btnCopy">复制</button>
+        <button class="btn" id="btnSave">下载</button>
+        <button class="btn btn--p" id="btnBack">返回</button>
+      </div>
+    </div>
+    <div class="sheet__body" id="recBody"></div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+ * 同声传译 · 英译中 · 前端
+ * 链路:麦克风 → 16kHz/16bit/单声道 PCM → 自建中转 → 阿里云 / 火山引擎
+ * ==========================================================================*/
+
+const TARGET_RATE = 16000, FRAME_SAMPLE = 640;   // 40ms @16k = 1280 字节
+
+/* ---------- 1. 音频:重采样 + 分帧 ---------- */
+class Resampler{
+  constructor(i,o){ this.step=i/o; this.pos=0; this.tail=new Float32Array(0); }
+  push(c){
+    const b=new Float32Array(this.tail.length+c.length);
+    b.set(this.tail,0); b.set(c,this.tail.length);
+    const out=[]; let p=this.pos;
+    while(Math.floor(p)+1<b.length){ const i=Math.floor(p),t=p-i; out.push(b[i]*(1-t)+b[i+1]*t); p+=this.step; }
+    // p 是下一个待读位置,可能已经越过本次缓冲区末尾(48k→16k 时每块都会),
+    // 必须钳制到 b.length,否则残余的小数位被丢掉,长时间会积累成时间轴漂移。
+    const used=Math.min(Math.floor(p),b.length); this.tail=b.slice(used); this.pos=p-used;
+    return Float32Array.from(out);
+  }
+}
+class Framer{
+  constructor(n,cb){ this.n=n; this.cb=cb; this.acc=new Int16Array(0); }
+  push(f){
+    const q=new Int16Array(f.length);
+    for(let i=0;i<f.length;i++){ const s=Math.max(-1,Math.min(1,f[i])); q[i]=s<0?s*0x8000:s*0x7FFF; }
+    const b=new Int16Array(this.acc.length+q.length);
+    b.set(this.acc,0); b.set(q,this.acc.length);
+    let o=0; while(b.length-o>=this.n){ this.cb(b.slice(o,o+this.n)); o+=this.n; }
+    this.acc=b.slice(o);
+  }
+  reset(){ this.acc=new Int16Array(0); }
+}
+const WORKLET=`class PcmTap extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c&&c.length)this.port.postMessage(c.slice(0));return true}}registerProcessor('pcm-tap',PcmTap);`;
+
+class Mic{
+  constructor(){ this.on=false; }
+  async start(onFrame){
+    // iOS 要求 AudioContext 在用户手势的同一个同步栈里创建,所以放在 await 之前
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) throw new Error('NO_AUDIO');
+    this.ctx = new AC();
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('NO_MEDIA');
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}, video:false });
+    if(this.ctx.state==='suspended') await this.ctx.resume();
+
+    const src=this.ctx.createMediaStreamSource(this.stream);
+    this.analyser=this.ctx.createAnalyser(); this.analyser.fftSize=256; this.analyser.smoothingTimeConstant=.75;
+    src.connect(this.analyser);
+
+    this.rs=new Resampler(this.ctx.sampleRate,TARGET_RATE);
+    this.fr=new Framer(FRAME_SAMPLE,onFrame);
+    const feed=f=>this.fr.push(this.rs.push(f));
+
+    let ok=false;
+    try{
+      const u=URL.createObjectURL(new Blob([WORKLET],{type:'application/javascript'}));
+      await this.ctx.audioWorklet.addModule(u); URL.revokeObjectURL(u);
+      this.node=new AudioWorkletNode(this.ctx,'pcm-tap');
+      this.node.port.onmessage=e=>{ if(this.on) feed(e.data); };
+      ok=true; this.mode='AudioWorklet';
+    }catch(e){ console.warn('[mic] AudioWorklet 不可用,回退 ScriptProcessor',e); }
+    if(!ok){
+      this.node=this.ctx.createScriptProcessor(4096,1,1);
+      this.node.onaudioprocess=e=>{ if(this.on) feed(e.inputBuffer.getChannelData(0)); };
+      this.mode='ScriptProcessor';
+    }
+    this.sink=this.ctx.createGain(); this.sink.gain.value=0;
+    src.connect(this.node); this.node.connect(this.sink); this.sink.connect(this.ctx.destination);
+    this.on=true;
+    console.log('[mic] %s · %dHz → %dHz · 每帧 %d 字节', this.mode, this.ctx.sampleRate, TARGET_RATE, FRAME_SAMPLE*2);
+  }
+  pause(){ this.on=false; }
+  resume(){ this.on=true; this.fr&&this.fr.reset(); }
+  stop(){ this.on=false;
+    try{this.node&&this.node.disconnect()}catch(e){}
+    try{this.stream&&this.stream.getTracks().forEach(t=>t.stop())}catch(e){}
+    try{this.ctx&&this.ctx.close()}catch(e){}
+    this.ctx=this.node=this.stream=this.analyser=null; }
+  level(){
+    if(!this.analyser||!this.on) return 0;
+    const a=new Uint8Array(this.analyser.frequencyBinCount); this.analyser.getByteFrequencyData(a);
+    let s=0; const n=Math.min(48,a.length); for(let i=0;i<n;i++) s+=a[i];
+    return Math.min(1,(s/n)/110);
+  }
+}
+
+/* ---------- 2. 配置 ---------- */
+const CFG_KEY='si.cfg.v1';
+const EP = {
+  aliBJ:  'wss://dashscope.aliyuncs.com/api-ws/v1/inference',
+  aliSG:  'wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference',
+  aliLLM: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  volc:   'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel',
+  ark:    'https://ark.cn-beijing.volces.com/api/v3'
+};
+const cfg = Object.assign({
+  provider:'demo',
+  aliKey:'', aliEp:EP.aliBJ, aliModel:'gummy-realtime-v1',
+  aliMode:'model', aliLLMModel:'qwen-flash', aliLLMBase:EP.aliLLM, aliVocab:'',
+  vcApp:'', vcTok:'', vcRes:'volc.bigasr.sauc.duration', vcLang:'en-US', vcEp:EP.volc,
+  arkKey:'', arkModel:'doubao-seed-1-6-flash-250828', arkBase:EP.ark,
+  relay:'', endSil:800
+}, (()=>{ try{ return JSON.parse(localStorage.getItem(CFG_KEY)||'{}'); }catch(e){ return {}; } })());
+const saveCfg=()=>{ try{ localStorage.setItem(CFG_KEY,JSON.stringify(cfg)); }catch(e){} };
+// 直接双击打开 html 时协议是 file:,location.host 为空,
+// 拼出来会是 ws:///asr 这种无效地址,所以要单独判掉。
+const FILE_MODE = location.protocol==='file:' || !location.host;
+const relayURL=c=>{
+  const v=((c||cfg).relay||'').trim();
+  if(v) return v;
+  if(FILE_MODE) return '';                       // 没有同源可用,必须手填
+  // 路径统一用 /api/asr:Vercel 上函数就在这个路径,本地 server.js 也同时监听它
+  return (location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/asr';
+};
+const NO_RELAY_MSG='你是直接打开的网页文件,没有中转服务。<br>'
+  +'请先双击 <b>start.bat</b>(或命令行 node server.js),<br>再打开 http://localhost:8787';
+
+/* ---------- 3. 数据源 ---------- */
+class Source{ constructor(){ this.onPartial=this.onFinal=this.onState=()=>{}; }
+  start(){} sendAudio(){} stop(){} get needMic(){ return true; } }
+
+const DEMO=[
+  ["Good morning everyone, thanks for joining today's session.","大家早上好,感谢各位参加今天的分享。"],
+  ["We're going to talk about how real-time translation actually works.","我们今天来聊聊实时翻译到底是怎么运作的。"],
+  ["The first step is turning speech into text, and it has to happen streaming.","第一步是把语音转成文字,而且必须是流式进行的。"],
+  ["Do have a look at the latency numbers on the next slide.","请务必看一下下一页的延迟数据。"],
+  ["If the delay goes past two seconds, people stop trusting the subtitles.","如果延迟超过两秒,观众就不再相信字幕了。"],
+  ["So the whole game is deciding what to translate before the sentence ends.","所以关键在于,怎么在句子说完之前就决定翻译哪一段。"]
+];
+class DemoSource extends Source{
+  get needMic(){ return false; }
+  start(){ this.i=0; this.onState('running'); this.next(); }
+  next(){
+    if(this.dead) return;
+    const [en,zh]=DEMO[this.i++%DEMO.length], w=en.split(' ');
+    let k=0;
+    const tick=()=>{
+      if(this.dead) return;
+      k++;
+      const r=k/w.length;
+      // 中文不跟着每个词跳,等英文积累到一定比例才推进,避免下半屏闪烁
+      const dst = r<0.45 ? '' : zh.slice(0, Math.floor(zh.length*Math.min(1,(r-0.2)/0.75)));
+      this.onPartial({src:w.slice(0,k).join(' '), dst});
+      this.t = k<w.length ? setTimeout(tick,130+Math.random()*130)
+        : setTimeout(()=>{ if(this.dead)return; this.onFinal({src:en,dst:zh});
+            this.t=setTimeout(()=>this.next(),500+Math.random()*700); },420);
+    };
+    this.t=setTimeout(tick,300);
+  }
+  stop(){ this.dead=true; clearTimeout(this.t); this.onState('closed'); }
+}
+
+/* 真实链路:浏览器 ──wss──> 你的中转(本地 Node / Vercel 函数)──> 阿里云 / 火山引擎
+ *
+ * 自动重连是必须的:Vercel 上一条 WebSocket 的寿命 = 函数最长执行时长,
+ * Hobby 版 300 秒就会被平台掐断。断了立刻重连,已有字幕不丢,
+ * 只损失重连那一瞬间(几百毫秒)的音频,基本无感。
+ * 但只有"曾经连通过"的会话才自动重连 —— 第一次就连不上(服务没起、密钥错)
+ * 要立刻把真实原因报出来,不能闷头重试把错误信息盖掉。
+ */
+const MAX_RETRY = 6;
+class RelaySource extends Source{
+  constructor(provider){ super(); this.provider=provider; this.q=[]; this.tries=0; this.everReady=false; }
+  start(){ this.connect(); }
+
+  connect(){
+    const url=relayURL();
+    if(!url) return this.onState('error', NO_RELAY_MSG);
+    this.url=url;
+    this.onState(this.tries ? 'reconnecting' : 'connecting',
+                 this.tries ? '连接中断,正在重连…('+this.tries+'/'+MAX_RETRY+')' : '');
+    let ws;
+    try{ ws=this.ws=new WebSocket(url); }
+    catch(e){ return this.onState('error','中转地址无效: '+url); }
+    ws.binaryType='arraybuffer';
+
+    ws.onopen=()=>{
+      ws.send(JSON.stringify({
+        type:'start', provider:this.provider,
+        sampleRate:TARGET_RATE, format:'pcm', from:'en', to:'zh',
+        endSilence:Number(cfg.endSil)||800,
+        creds: credsFor(this.provider)
+      }));
+      this.q.splice(0).forEach(b=>ws.send(b));
+    };
+
+    ws.onmessage=e=>{
+      let m; try{ m=JSON.parse(e.data); }catch(err){ return; }
+      if(m.type==='partial')      this.onPartial({src:m.src||'',dst:m.dst||''});
+      else if(m.type==='final')   this.onFinal({src:m.src||'',dst:m.dst||''});
+      else if(m.type==='ready'){  this.everReady=true; this.tries=0; this.onState('running'); }
+      else if(m.type==='error'){  this.hadError=true; this.onState('error', m.message||'服务返回错误'); }
+    };
+
+    // 连不上时浏览器只给一个无信息的 error 事件,统一在 onclose 里判断怎么处理
+    ws.onerror=()=>{};
+    ws.onclose=()=>{
+      if(this.dead) return;
+      if(this.hadError) return;                       // 上游已经报过具体原因,别覆盖
+      if(!this.everReady){                            // 从来没连通,是配置/服务问题
+        return this.onState('error',
+          '连不上中转服务<br>'+esc(this.url)+'<br>确认服务在跑,或检查中转地址');
+      }
+      if(this.tries>=MAX_RETRY)
+        return this.onState('error','重连 '+MAX_RETRY+' 次仍失败,点击重试');
+      this.tries++;
+      const delay=Math.min(400*Math.pow(1.8,this.tries-1),8000);
+      this.onState('reconnecting','连接中断,正在重连…('+this.tries+'/'+MAX_RETRY+')');
+      this.timer=setTimeout(()=>this.connect(),delay);
+    };
+  }
+
+  sendAudio(f){
+    const b=f.buffer;
+    if(!this.ws||this.ws.readyState===0){ if(this.q.length<250) this.q.push(b); return; }
+    if(this.ws.readyState===1) this.ws.send(b);
+    else if(this.q.length<250) this.q.push(b);        // 重连窗口期先攒着
+  }
+
+  stop(){ this.dead=true; clearTimeout(this.timer);
+    try{ if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify({type:'stop'})); }catch(e){}
+    try{ this.ws&&this.ws.close(1000); }catch(e){} }
+}
+
+function credsFor(p, c){
+  c = c || cfg;
+  return p==='aliyun'
+    ? { apiKey:c.aliKey, endpoint:c.aliEp, model:c.aliModel,
+        translateMode:c.aliMode, llmModel:c.aliLLMModel, llmBase:c.aliLLMBase,
+        vocabularyId:c.aliVocab }
+    : { appId:c.vcApp, accessToken:c.vcTok, resourceId:c.vcRes,
+        language:c.vcLang||'en-US', endpoint:c.vcEp,
+        arkKey:c.arkKey, arkModel:c.arkModel, arkBase:c.arkBase };
+}
+const makeSource=()=> cfg.provider==='demo' ? new DemoSource() : new RelaySource(cfg.provider);
+
+/* ---------- 4. 界面 ---------- */
+const $=id=>document.getElementById(id);
+const srcBody=$('srcBody'), dstBody=$('dstBody'), toast=$('toast'), meta=$('meta'),
+      runLabel=$('runLabel'), runIcon=$('runIcon'),
+      btnRun=$('btnRun'), btnBi=$('btnBi'), btnPip=$('btnPip'), btnDone=$('btnDone'),
+      btnClear=$('btnClear'), clearLabel=$('clearLabel');
+
+const S={ running:false, paused:false, reconnecting:false, bilingual:true,
+          history:[], partial:{src:'',dst:''}, t0:0, timer:null };
+let mic=null, source=null, pipWin=null, tmpT=null;
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+const PROVIDER_NAME={demo:'演示数据',aliyun:'阿里云百炼',volc:'火山引擎'};
+const HINT = () =>
+  FILE_MODE && cfg.provider!=='demo'
+   ? '⚠ 你是直接打开的网页文件,连不到中转服务。<br>请先双击 <b>start.bat</b>,再打开 http://localhost:8787'
+   : cfg.provider==='demo'
+   ? '当前为演示模式,点「开始」即可预览效果。<br>要用真实识别,点右上角齿轮填入密钥。'
+   : '点击下方「开始」进行收音';
+
+function render(){
+  const rows=k=>{
+    let h=S.history.map(r=>'<p class="line">'+esc(r[k])+'</p>').join('');
+    if(S.partial[k]) h+='<p class="line line--interim">'+esc(S.partial[k])+'</p>';
+    return h;
+  };
+  const s=rows('src');
+  srcBody.innerHTML = s || '<p class="empty">'+HINT()+'</p>';
+  dstBody.innerHTML = rows('dst');
+  srcBody.scrollTop=srcBody.scrollHeight; dstBody.scrollTop=dstBody.scrollHeight;
+  // 字幕是持续累积的,禁用态必须跟着每次渲染重算,不能只在开始/暂停时算一次
+  btnClear.disabled=!S.history.length&&!S.partial.src&&!S.partial.dst;
+  btnDone.disabled=!S.running&&S.history.length===0;
+  paintPip();
+}
+// 直接弹提示时必须掐掉 flash 的还原定时器,
+// 否则旧定时器到点会把后来更具体的报错(比如"没填 API Key")盖成通用文案。
+const showToast=m=>{ clearTimeout(tmpT); toast.innerHTML=m; toast.classList.add('is-show'); };
+const hideToast=()=>toast.classList.remove('is-show');
+function flash(m){ showToast(m); tmpT=setTimeout(()=>{
+  if(S.running&&!S.paused) hideToast();
+  else if(S.paused) showToast('收音已暂停,点击重试');
+  else hideToast(); },2200); }
+
+function setMeta(){
+  if(!S.running){ meta.textContent = S.history.length?'已停止':('未开始 · '+PROVIDER_NAME[cfg.provider]); return; }
+  const t=Math.floor((Date.now()-S.t0)/1000);
+  meta.textContent=(S.paused?'已暂停 ':'已进行 ')
+    +String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')
+    +' · '+PROVIDER_NAME[cfg.provider]
+    +(S.reconnecting?' · 重连中…':'');
+}
+
+/* 波形 */
+const cv=$('meter'), c2=cv.getContext('2d'); const BARS=5; let bars=new Array(BARS).fill(.12);
+(function loop(){
+  const w=cv.width,h=cv.height, live=S.running&&!S.paused;
+  for(let i=BARS-1;i>0;i--) bars[i]=bars[i-1];
+  const lv = mic ? mic.level()
+    : (live ? .34+.34*Math.abs(Math.sin(Date.now()/370))+Math.random()*.18 : 0); // 演示模式的假电平
+  bars[0]= live ? Math.max(.12, lv*(.55+Math.random()*.65)) : .1;
+  c2.clearRect(0,0,w,h); c2.fillStyle= live?'#35C8F5':'#2b4249';
+  const bw=w/(BARS*2-1);
+  for(let i=0;i<BARS;i++){ const bh=Math.max(3,bars[i]*h),x=i*bw*2,y=(h-bh)/2;
+    c2.beginPath(); c2.roundRect?c2.roundRect(x,y,bw,bh,bw/2):c2.rect(x,y,bw,bh); c2.fill(); }
+  requestAnimationFrame(loop);
+})();
+
+function wire(s){
+  s.onPartial=p=>{ S.partial={src:p.src||'',dst:p.dst||''}; render(); };
+  s.onFinal=f=>{ if(f.src||f.dst) S.history.push({src:f.src||'',dst:f.dst||''});
+                 S.partial={src:'',dst:''}; render(); };
+  s.onState=(st,msg)=>{
+    if(st==='running'){ S.reconnecting=false; hideToast(); setMeta(); }
+    // 重连不算出错:麦克风继续开着,已有字幕保留,只在顶部标一下状态。
+    // 上游会话是重开的,没定稿的半句会被重新识别一遍,所以先清掉免得重复。
+    if(st==='reconnecting'){ S.reconnecting=true; S.partial={src:'',dst:''}; render(); setMeta(); }
+    if(st==='error'){
+      S.reconnecting=false; S.paused=true; mic&&mic.pause();
+      showToast(msg||'连接中断,点击重试'); syncRun(); setMeta();
+    }
+  };
+  return s;
+}
+
+async function start(){
+  // 先确认有中转可连,再去要麦克风权限 —— 否则白弹一次授权框才发现连不上
+  if(cfg.provider!=='demo' && !relayURL()) return showToast(NO_RELAY_MSG);
+  const src=wire(makeSource());
+  if(src.needMic){
+    if(!window.isSecureContext){
+      return showToast('浏览器不允许在 http 页面使用麦克风<br>请用 https 或 localhost 打开');
+    }
+    try{
+      mic=new Mic();
+      await mic.start(f=>{ if(source&&!S.paused) source.sendAudio(f); });
+    }catch(e){
+      console.error(e); mic=null;
+      const n=(e&&e.name)||String(e&&e.message);
+      return showToast(n==='NotAllowedError'?'麦克风权限被拒绝,点击重试'
+        : n==='NotFoundError'?'没找到麦克风设备'
+        : '无法打开麦克风,点击重试');
+    }
+  }
+  source=src; source.start();
+  S.running=true; S.paused=false; S.t0=Date.now();
+  hideToast(); syncRun(); render();
+  clearInterval(S.timer); S.timer=setInterval(setMeta,250); setMeta();
+}
+function pause(){ S.paused=true; mic&&mic.pause(); showToast('收音已暂停,点击重试'); syncRun(); setMeta(); }
+function resume(){ if(!S.running) return start(); S.paused=false; mic&&mic.resume(); hideToast(); syncRun(); setMeta(); }
+function stopAll(){
+  S.running=false; S.paused=false; S.reconnecting=false; clearInterval(S.timer);
+  try{source&&source.stop()}catch(e){} try{mic&&mic.stop()}catch(e){}
+  source=null; mic=null; hideToast(); syncRun(); setMeta();
+}
+function syncRun(){
+  const live=S.running&&!S.paused;
+  runLabel.textContent= live?'暂停':(S.running?'继续':'开始');
+  btnRun.classList.toggle('is-on',live);
+  runIcon.setAttribute('d', live
+    ? 'M9.5 8.3 h1.9 v7.4 h-1.9 z M12.6 8.3 h1.9 v7.4 h-1.9 z'   // 暂停:两根竖条
+    : 'M10 8.2 L16.4 12 L10 15.8 Z');                          // 播放:三角
+  btnDone.disabled=!S.running&&S.history.length===0;
+}
+
+btnRun.onclick=()=>!S.running?start():(S.paused?resume():pause());
+toast.onclick=()=>S.running?resume():start();
+btnBi.onclick=()=>{ S.bilingual=!S.bilingual; document.body.classList.toggle('mono',!S.bilingual);
+                    btnBi.classList.toggle('is-on',S.bilingual); render(); };
+$('langBtn').onclick=()=>flash('当前仅支持 英 &#8594; 中');
+
+/* 清空当前字幕。一整场同传的记录点没了很难受,所以要点两下确认。
+   清空不会停止收音,接着说就接着出字。 */
+let clearArm=null;
+const disarmClear=()=>{ clearTimeout(clearArm); clearArm=null;
+  btnClear.classList.remove('is-on'); clearLabel.textContent='清空'; };
+btnClear.onclick=()=>{
+  if(btnClear.disabled) return;
+  if(!clearArm){
+    btnClear.classList.add('is-on'); clearLabel.textContent='再点一次';
+    clearArm=setTimeout(disarmClear,3000);
+    return;
+  }
+  disarmClear();
+  S.history.length=0; S.partial={src:'',dst:''};
+  render(); syncRun(); setMeta(); paintPip();
+  flash('已清空');
+};
+
+/* 浮窗:Document Picture-in-Picture(Chrome/Edge 116+),只显示译文 */
+btnPip.onclick=async()=>{
+  if(pipWin){ pipWin.close(); return; }
+  if(!('documentPictureInPicture' in window)) return flash('当前浏览器不支持浮窗<br>桌面版 Chrome / Edge 可用');
+  try{
+    pipWin=await documentPictureInPicture.requestWindow({width:480,height:200});
+    pipWin.document.head.insertAdjacentHTML('beforeend',
+      '<style>html,body{margin:0;height:100%}body{background:#07181E;color:#fff;padding:14px 18px;overflow:hidden;'
+      +'display:flex;flex-direction:column;justify-content:flex-end;'
+      +'font:400 21px/1.45 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}'
+      +'p{margin:0 0 .35em}p.i{color:#8A979C}</style>');
+    pipWin.document.body.innerHTML='<div id="p"></div>';
+    btnPip.classList.add('is-on');
+    pipWin.addEventListener('pagehide',()=>{ pipWin=null; btnPip.classList.remove('is-on'); });
+    paintPip();
+  }catch(e){ pipWin=null; flash('浮窗打开失败'); }
+};
+function paintPip(){
+  if(!pipWin||pipWin.closed) return;
+  const box=pipWin.document.getElementById('p'); if(!box) return;
+  box.innerHTML=S.history.slice(-3).map(r=>'<p>'+esc(r.dst)+'</p>').join('')
+    +(S.partial.dst?'<p class="i">'+esc(S.partial.dst)+'</p>':'');
+}
+
+/* ---------- 5. 设置面板 ---------- */
+const setSheet=$('setSheet'), recSheet=$('recSheet');
+const F={provider:$('provider'),
+  aliKey:$('aliKey'),aliEp:$('aliEp'),aliModel:$('aliModel'),aliMode:$('aliMode'),
+  aliLLMModel:$('aliLLMModel'),aliLLMBase:$('aliLLMBase'),aliVocab:$('aliVocab'),
+  vcApp:$('vcApp'),vcTok:$('vcTok'),vcRes:$('vcRes'),vcLang:$('vcLang'),vcEp:$('vcEp'),
+  arkKey:$('arkKey'),arkModel:$('arkModel'),arkBase:$('arkBase'),
+  relay:$('relay'),endSil:$('endSil')};
+
+/* 控制台给的「API Host」只是个主机名,这里补全协议和路径,
+   用户直接粘贴就能用,不用自己拼 wss:// 和 /api-ws/v1/inference。 */
+function normWs(v, defPath){
+  v=(v||'').trim(); if(!v) return '';
+  v=v.replace(/^https?:\/\//i,'');
+  if(!/^wss?:\/\//i.test(v)) v='wss://'+v;
+  try{ const u=new URL(v);
+    if(!u.pathname || u.pathname==='/') u.pathname=defPath;
+    return u.toString().replace(/\/+$/,'');
+  }catch(e){ return v; }
+}
+function normHttp(v, defPath){
+  v=(v||'').trim(); if(!v) return '';
+  v=v.replace(/^wss?:\/\//i,'');
+  if(!/^https?:\/\//i.test(v)) v='https://'+v;
+  try{ const u=new URL(v);
+    if(!u.pathname || u.pathname==='/') u.pathname=defPath;
+    return u.toString().replace(/\/+$/,'');
+  }catch(e){ return v; }
+}
+
+/* 读表单(不落盘),顺手把地址规范化并回填,让用户看见真正会用的地址 */
+function collect(){
+  const o={};
+  for(const k in F) o[k]= k==='endSil' ? (Number(F[k].value)||800) : F[k].value.trim();
+  o.aliEp      = normWs(o.aliEp,'/api-ws/v1/inference')          || EP.aliBJ;
+  o.vcEp       = normWs(o.vcEp,'/api/v3/sauc/bigmodel')          || EP.volc;
+  o.aliLLMBase = normHttp(o.aliLLMBase,'/compatible-mode/v1')    || EP.aliLLM;
+  o.arkBase    = normHttp(o.arkBase,'/api/v3')                   || EP.ark;
+  o.aliModel   = o.aliModel   || 'gummy-realtime-v1';
+  o.aliLLMModel= o.aliLLMModel|| 'qwen-flash';
+  o.arkModel   = o.arkModel   || 'doubao-seed-1-6-flash-250828';
+  ['aliEp','vcEp','aliLLMBase','arkBase','aliModel','aliLLMModel','arkModel']
+    .forEach(k=>{ F[k].value=o[k]; });
+  return o;
+}
+function fillForm(){ for(const k in F) F[k].value = cfg[k] ?? ''; syncGroups(); }
+function syncGroups(){
+  const p=F.provider.value;
+  $('grpAli').hidden  = p!=='aliyun';
+  $('grpVolc').hidden = p!=='volc';
+  $('aliLLM').hidden  = F.aliMode.value!=='llm';
+}
+F.provider.onchange=syncGroups;
+F.aliMode.onchange=syncGroups;
+
+// 预设地址小胶囊
+setSheet.addEventListener('click',e=>{
+  const c=e.target.closest('[data-fill]'); if(!c) return;
+  F[c.dataset.fill].value=c.dataset.v;
+});
+
+/* 测试连接:走中转做一次握手 + run-task,拿真实结果,不送音频不计费多少 */
+const probeBox=$('probeMsg');
+const setProbe=(cls,msg)=>{ probeBox.className='probe '+cls; probeBox.textContent=msg; };
+$('setProbe').onclick=()=>{
+  const p=F.provider.value;
+  if(p==='demo') return setProbe('wait','演示模式不联网,不需要测试。');
+  const snap=collect();
+  const url=relayURL(snap);
+  if(!url) return setProbe('bad',
+    '✗ 你是直接打开的网页文件,没有中转服务可用。请先运行 start.bat,再打开 http://localhost:8787;'
+    + '或者在下面「中转服务地址」里填 ws://localhost:8787/asr');
+  setProbe('wait','正在连接 '+(p==='aliyun'?snap.aliEp:snap.vcEp)+' …');
+  let ws; try{ ws=new WebSocket(url); }
+  catch(e){ return setProbe('bad','中转地址无效: '+url); }
+  const t=setTimeout(()=>{ try{ws.close()}catch(e){} setProbe('bad','超时,中转服务 12 秒没响应。'); },12000);
+  ws.onopen=()=>ws.send(JSON.stringify({type:'probe',provider:p,
+    sampleRate:TARGET_RATE,from:'en',to:'zh',endSilence:snap.endSil,creds:credsFor(p,snap)}));
+  ws.onmessage=e=>{
+    let m; try{ m=JSON.parse(e.data); }catch(err){ return; }
+    if(m.type!=='probe-result') return;
+    clearTimeout(t); setProbe(m.ok?'ok':'bad', (m.ok?'✓ ':'✗ ')+m.message);
+    try{ ws.close(); }catch(err){}
+  };
+  ws.onerror=()=>{ clearTimeout(t);
+    setProbe('bad','✗ 连不上中转服务 '+url+',确认 node server.js 在跑。'); };
+};
+
+$('btnSet').onclick=()=>{
+  fillForm();
+  if(FILE_MODE) setProbe('bad',
+    '你是直接双击打开的 html 文件(file:// 协议)。这样没有中转服务,也可能用不了麦克风。'
+    + '正确做法:双击 start.bat,然后浏览器打开 http://localhost:8787');
+  else probeBox.className='probe';
+  setSheet.classList.add('is-show');
+};
+$('setSave').onclick=()=>{
+  Object.assign(cfg, collect());
+  saveCfg(); setSheet.classList.remove('is-show');
+  if(S.running){ stopAll(); flash('设置已保存,重新点「开始」生效'); }
+  else { setMeta(); render(); flash('已保存 · ' + PROVIDER_NAME[cfg.provider]); }
+};
+$('setClear').onclick=()=>{
+  ['aliKey','aliVocab','vcApp','vcTok','arkKey'].forEach(k=>{ cfg[k]=''; F[k].value=''; });
+  saveCfg(); setProbe('wait','密钥已清空。');
+};
+
+/* ---------- 6. 记录导出 ---------- */
+btnDone.onclick=()=>{
+  stopAll();
+  $('recCount').textContent='· '+S.history.length+' 句';
+  $('recBody').innerHTML = S.history.length
+    ? S.history.map(r=>'<div class="rec"><b>'+esc(r.src)+'</b><span>'+esc(r.dst)+'</span></div>').join('')
+    : '<p style="color:#5E6E73">这次没有记录到内容。</p>';
+  recSheet.classList.add('is-show');
+};
+$('btnBack').onclick=()=>recSheet.classList.remove('is-show');
+const asText=()=>S.history.map(r=>r.src+'\n'+r.dst).join('\n\n');
+$('btnCopy').onclick=async()=>{
+  const b=$('btnCopy');
+  try{ await navigator.clipboard.writeText(asText()); b.textContent='已复制'; }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=asText();
+    ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta);
+    ta.select(); try{ document.execCommand('copy'); b.textContent='已复制'; }
+    catch(e2){ b.textContent='复制失败'; } document.body.removeChild(ta);
+  }
+  setTimeout(()=>b.textContent='复制',1400);
+};
+$('btnSave').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([asText()],{type:'text/plain;charset=utf-8'}));
+  a.download='同传记录-'+new Date().toISOString().slice(0,19).replace(/[:T-]/g,'')+'.txt';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+};
+
+/* ---------- 7. 杂项 ---------- */
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){ e.preventDefault(); btnRun.click(); }
+  if(e.key==='Escape'){ recSheet.classList.remove('is-show'); setSheet.classList.remove('is-show'); }
+});
+window.addEventListener('pagehide',stopAll);
+// 手机锁屏 / 切到后台时,连接常被系统掐断,回来给个明确提示而不是静默失效
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden && S.running && !S.paused && cfg.provider!=='demo'){ pause(); }
+});
+
+fillForm(); syncRun(); setMeta(); render();
+console.log('%c同传前端就绪','color:#2AC3F2;font-weight:bold');
+console.log('当前服务:',PROVIDER_NAME[cfg.provider],'· 中转:',relayURL());
+</script>
+</body>
+</html>
