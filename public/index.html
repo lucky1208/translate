@@ -381,7 +381,51 @@ class Framer{
   }
   reset(){ this.acc=new Int16Array(0); }
 }
-const WORKLET=`class PcmTap extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c&&c.length)this.port.postMessage(c.slice(0));return true}}registerProcessor('pcm-tap',PcmTap);`;
+/* 重采样和分帧全部放进 AudioWorklet 里做。
+ * 关键原因:窗口最小化 / 切到别的标签页时,浏览器会把主线程的定时器降频到每分钟一次,
+ * 但 AudioWorklet 跑在音频渲染线程上,实时优先级,完全不受影响。
+ * 主线程只负责把做好的帧丢进 WebSocket,不参与任何计时。 */
+const WORKLET=`
+class PcmTap extends AudioWorkletProcessor{
+  constructor(o){
+    super();
+    const p=(o&&o.processorOptions)||{};
+    this.step=sampleRate/(p.targetRate||16000);   // sampleRate 是 worklet 全局量
+    this.n=p.frameSamples||640;
+    this.pos=0; this.tail=new Float32Array(0); this.acc=new Int16Array(0); this.on=true;
+    this.port.onmessage=e=>{
+      const m=e.data||{};
+      if(m.cmd==='gate') this.on=!!m.on;
+      if(m.cmd==='reset'){ this.tail=new Float32Array(0); this.acc=new Int16Array(0); this.pos=0; }
+    };
+  }
+  process(inputs){
+    if(!this.on) return true;
+    const ch=inputs[0]&&inputs[0][0];
+    if(!ch||!ch.length) return true;
+    // 线性插值重采样(48k/44.1k → 16k)
+    const b=new Float32Array(this.tail.length+ch.length);
+    b.set(this.tail,0); b.set(ch,this.tail.length);
+    const out=[]; let p=this.pos;
+    while(Math.floor(p)+1<b.length){ const i=Math.floor(p),t=p-i; out.push(b[i]*(1-t)+b[i+1]*t); p+=this.step; }
+    const used=Math.min(Math.floor(p),b.length);   // 必须钳制,否则小数残余丢失会积累成漂移
+    this.tail=b.slice(used); this.pos=p-used;
+    // Float32 → Int16,凑够一帧就发
+    const q=new Int16Array(out.length);
+    for(let i=0;i<out.length;i++){ const s=Math.max(-1,Math.min(1,out[i])); q[i]=s<0?s*0x8000:s*0x7FFF; }
+    const a=new Int16Array(this.acc.length+q.length);
+    a.set(this.acc,0); a.set(q,this.acc.length);
+    let o=0;
+    while(a.length-o>=this.n){
+      const f=a.slice(o,o+this.n);
+      this.port.postMessage(f.buffer,[f.buffer]);   // 转移所有权,不拷贝
+      o+=this.n;
+    }
+    this.acc=a.slice(o);
+    return true;
+  }
+}
+registerProcessor('pcm-tap',PcmTap);`;
 
 class Mic{
   constructor(){ this.on=false; }
@@ -399,30 +443,49 @@ class Mic{
     this.analyser=this.ctx.createAnalyser(); this.analyser.fftSize=256; this.analyser.smoothingTimeConstant=.75;
     src.connect(this.analyser);
 
-    this.rs=new Resampler(this.ctx.sampleRate,TARGET_RATE);
-    this.fr=new Framer(FRAME_SAMPLE,onFrame);
-    const feed=f=>this.fr.push(this.rs.push(f));
+    // onFrame 两条路径都收 ArrayBuffer,签名统一
+    const emit=buf=>{ this.lastFrameAt=Date.now(); onFrame(buf); };
 
     let ok=false;
     try{
       const u=URL.createObjectURL(new Blob([WORKLET],{type:'application/javascript'}));
       await this.ctx.audioWorklet.addModule(u); URL.revokeObjectURL(u);
-      this.node=new AudioWorkletNode(this.ctx,'pcm-tap');
-      this.node.port.onmessage=e=>{ if(this.on) feed(e.data); };
+      this.node=new AudioWorkletNode(this.ctx,'pcm-tap',
+        { processorOptions:{ targetRate:TARGET_RATE, frameSamples:FRAME_SAMPLE } });
+      this.node.port.onmessage=e=>{ if(this.on) emit(e.data); };
       ok=true; this.mode='AudioWorklet';
     }catch(e){ console.warn('[mic] AudioWorklet 不可用,回退 ScriptProcessor',e); }
     if(!ok){
+      // 老浏览器兜底:只能在主线程算,后台会被降频,但总比不能用强
+      this.rs=new Resampler(this.ctx.sampleRate,TARGET_RATE);
+      this.fr=new Framer(FRAME_SAMPLE,f=>emit(f.buffer));
       this.node=this.ctx.createScriptProcessor(4096,1,1);
-      this.node.onaudioprocess=e=>{ if(this.on) feed(e.inputBuffer.getChannelData(0)); };
+      this.node.onaudioprocess=e=>{ if(this.on) this.fr.push(this.rs.push(e.inputBuffer.getChannelData(0))); };
       this.mode='ScriptProcessor';
     }
     this.sink=this.ctx.createGain(); this.sink.gain.value=0;
     src.connect(this.node); this.node.connect(this.sink); this.sink.connect(this.ctx.destination);
-    this.on=true;
+
+    // 系统休眠、切换音频设备等会让 AudioContext 掉进 suspended,自动拉回来
+    this.ctx.onstatechange=()=>{
+      if(this.ctx && this.ctx.state==='suspended' && this.on)
+        this.ctx.resume().catch(()=>{});
+    };
+
+    this.on=true; this.lastFrameAt=Date.now();
     console.log('[mic] %s · %dHz → %dHz · 每帧 %d 字节', this.mode, this.ctx.sampleRate, TARGET_RATE, FRAME_SAMPLE*2);
   }
-  pause(){ this.on=false; }
-  resume(){ this.on=true; this.fr&&this.fr.reset(); }
+  gate(on){ try{ this.node && this.node.port && this.node.port.postMessage({cmd:'gate',on}); }catch(e){} }
+  pause(){ this.on=false; this.gate(false); }
+  resume(){ this.on=true; this.gate(true);
+    try{ this.node && this.node.port && this.node.port.postMessage({cmd:'reset'}); }catch(e){}
+    this.fr&&this.fr.reset(); this.lastFrameAt=Date.now(); this.kick(); }
+  // 从后台回到前台时叫醒:AudioContext 被挂起就恢复,轨道被静音也拉回来
+  kick(){
+    try{ if(this.ctx && this.ctx.state!=='running') this.ctx.resume().catch(()=>{}); }catch(e){}
+  }
+  // 距上一帧音频过去多久了 —— 用来判断链路是不是悄悄断了
+  stalledFor(){ return this.on && this.lastFrameAt ? Date.now()-this.lastFrameAt : 0; }
   stop(){ this.on=false;
     try{this.node&&this.node.disconnect()}catch(e){}
     try{this.stream&&this.stream.getTracks().forEach(t=>t.stop())}catch(e){}
@@ -573,11 +636,17 @@ class RelaySource extends Source{
     };
   }
 
-  sendAudio(f){
-    const b=f.buffer;
+  sendAudio(b){                                       // b 是 ArrayBuffer
     if(!this.ws||this.ws.readyState===0){ if(this.q.length<250) this.q.push(b); return; }
     if(this.ws.readyState===1) this.ws.send(b);
     else if(this.q.length<250) this.q.push(b);        // 重连窗口期先攒着
+  }
+  // 从后台回到前台时调用:连接要是死了就立刻重连,不等退避计时
+  kick(){
+    if(this.dead||this.hadError) return;
+    const st=this.ws?this.ws.readyState:3;
+    if(st===0||st===1) return;                        // 正在连或连着,不用管
+    clearTimeout(this.timer); this.tries=0; this.connect();
   }
 
   stop(){ this.dead=true; clearTimeout(this.timer);
@@ -649,10 +718,14 @@ const tag=()=> cfg.provider==='demo'
 function setMeta(){
   if(!S.running){ meta.innerHTML = S.history.length?'已停止':('未开始 · '+tag()); return; }
   const t=Math.floor((Date.now()-S.t0)/1000);
+  // 音频断流检测:手机切后台、系统抢走麦克风时会发生。
+  // 桌面端切窗口不会触发 —— 那种情况音频照常在跑。
+  const stall = mic && !S.paused && mic.stalledFor()>4000;
   meta.innerHTML=(S.paused?'已暂停 ':'已进行 ')
     +String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')
     +' · '+tag()
-    +(S.reconnecting?' · 重连中…':'');
+    +(S.reconnecting?' · 重连中…':'')
+    +(stall?' · <b style="color:#D9A441;font-weight:600">收音中断,点「暂停」再点「继续」</b>':'');
 }
 
 /* 波形 */
@@ -708,17 +781,17 @@ async function start(){
   }
   source=src; source.start();
   S.running=true; S.paused=false; S.t0=Date.now();
-  hideToast(); syncRun(); render();
+  hideToast(); syncRun(); render(); keepAwake();
   clearInterval(S.timer); S.timer=setInterval(setMeta,250); setMeta();
 }
-function pause(){ S.paused=true; mic&&mic.pause(); source&&source.pause();
+function pause(){ S.paused=true; mic&&mic.pause(); source&&source.pause(); releaseAwake();
   showToast('收音已暂停,点击重试'); syncRun(); setMeta(); }
 function resume(){ if(!S.running) return start(); S.paused=false; mic&&mic.resume(); source&&source.resume();
-  hideToast(); syncRun(); setMeta(); }
+  keepAwake(); hideToast(); syncRun(); setMeta(); }
 function stopAll(){
   S.running=false; S.paused=false; S.reconnecting=false; clearInterval(S.timer);
   try{source&&source.stop()}catch(e){} try{mic&&mic.stop()}catch(e){}
-  source=null; mic=null; hideToast(); syncRun(); setMeta();
+  source=null; mic=null; releaseAwake(); hideToast(); syncRun(); setMeta();
 }
 function syncRun(){
   const live=S.running&&!S.paused;
@@ -921,10 +994,31 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){ recSheet.classList.remove('is-show'); setSheet.classList.remove('is-show'); }
 });
 window.addEventListener('pagehide',stopAll);
-// 手机锁屏 / 切到后台时,连接常被系统掐断,回来给个明确提示而不是静默失效
+
+/* 窗口最小化、切到别的标签页 —— 一律继续收音,不做任何暂停。
+ * 之前这里一见 document.hidden 就 pause(),结果最小化窗口就翻译不了了。
+ * 音频链路本身不怕后台:AudioWorklet 在音频线程上跑,不受主线程降频影响。
+ * 回到前台时做一次体检:AudioContext 被系统挂起就恢复,连接死了就重连。 */
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden && S.running && !S.paused && cfg.provider!=='demo'){ pause(); }
+  if(document.hidden) return;
+  if(!S.running || S.paused) return;
+  mic && mic.kick();
+  source && source.kick && source.kick();
+  keepAwake();
 });
+
+/* 屏幕常亮。手机上尤其需要 —— 屏幕一灭,系统很快就把页面冻结了。
+ * 锁在页面可见时才有效,所以每次回到前台都要重新申请。 */
+let wakeLock=null;
+async function keepAwake(){
+  try{
+    if(!('wakeLock' in navigator) || document.hidden) return;
+    if(wakeLock && !wakeLock.released) return;
+    wakeLock=await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release',()=>{ wakeLock=null; });
+  }catch(e){}
+}
+function releaseAwake(){ try{ wakeLock && wakeLock.release(); }catch(e){} wakeLock=null; }
 
 fillForm(); syncRun(); setMeta(); render();
 
