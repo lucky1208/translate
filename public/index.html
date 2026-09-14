@@ -4,15 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#000000">
+<meta name="description" content="实时把英语语音翻译成中文字幕">
+<!-- 装到手机主屏后按独立 App 运行,没有浏览器地址栏 -->
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="同传">
+<meta name="application-name" content="同传">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon.png">
 <title>同声传译 · 英译中</title>
 <style>
   :root{
     --src-bg:#000; --dst-top:#0D2A33; --dst-bot:#06171D;
     --label:#5E6E73; --label-dst:#5D797F;
     --text:#fff; --interim:#8A979C; --accent:#2AC3F2; --dock-fg:#93A6AB;
+    /* 装到主屏后是全屏运行,内容会顶到刘海和底部横条下面,必须让开 */
     --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-t:env(safe-area-inset-top,0px);
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -23,12 +33,12 @@
 
   .pane{position:relative;flex:1 1 50%;min-height:0;display:flex;flex-direction:column;
         padding:0 clamp(16px,5vw,34px);overflow:hidden}
-  .pane--src{background:var(--src-bg);padding-top:clamp(40px,10vw,58px)}
+  .pane--src{background:var(--src-bg);padding-top:calc(clamp(40px,10vw,58px) + var(--safe-t))}
   .pane--dst{background:linear-gradient(180deg,var(--dst-top) 0%,var(--dst-bot) 100%);padding-top:clamp(18px,4.5vw,26px)}
   body.mono .pane--src{display:none}
-  body.mono .pane--dst{flex:1 1 100%;padding-top:clamp(40px,10vw,58px)}
+  body.mono .pane--dst{flex:1 1 100%;padding-top:calc(clamp(40px,10vw,58px) + var(--safe-t))}
 
-  .meta{position:absolute;top:clamp(10px,2.6vw,16px);left:0;right:0;text-align:center;
+  .meta{position:absolute;top:calc(clamp(10px,2.6vw,16px) + var(--safe-t));left:0;right:0;text-align:center;
         font-size:clamp(12px,3.2vw,15px);color:#474C4F;pointer-events:none;z-index:2;
         font-variant-numeric:tabular-nums;padding:0 12px}
 
@@ -70,6 +80,9 @@
         border-radius:22px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   .dock__grp{display:flex;flex:1 1 0}
   .dock__grp+.dock__grp{flex:3 1 0;border-left:1px solid rgba(255,255,255,.09)}
+  /* 手机上没有画中画浮窗,整组藏掉,剩下的按钮铺满 */
+  body.no-pip .dock__grp:first-child{display:none}
+  body.no-pip .dock__grp+.dock__grp{border-left:0;flex:1 1 auto}
   .dock__btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
              padding:clamp(10px,2.8vw,15px) 3px;background:none;border:0;cursor:pointer;
              color:var(--dock-fg);font-size:clamp(11px,2.9vw,14px);font-family:inherit;transition:color .15s}
@@ -113,6 +126,12 @@
   .probe.ok{display:block;background:rgba(46,190,120,.12);border:1px solid rgba(46,190,120,.35);color:#7BD6A6}
   .probe.bad{display:block;background:rgba(240,90,90,.1);border:1px solid rgba(240,90,90,.32);color:#F0A0A0}
   .probe.wait{display:block;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#93A6AB}
+  .install{background:rgba(42,195,242,.09);border:1px solid rgba(42,195,242,.3);
+           border-radius:12px;padding:14px 15px;margin-bottom:18px}
+  .install__t{font-size:14.5px;color:var(--accent);font-weight:600;margin-bottom:8px}
+  .install__b{font-size:13px;color:#9FB3B9;line-height:1.75}
+  .install__b b{color:#fff;font-weight:600}
+  .install__acts{display:flex;gap:8px;margin-top:12px}
   .note{font-size:12.5px;color:#5E7178;line-height:1.7;border-left:2px solid rgba(42,195,242,.35);
         padding-left:12px;margin:4px 0 18px}
 
@@ -185,6 +204,15 @@
     </div>
     <div class="sheet__body">
       <div class="probe" id="probeMsg"></div>
+
+      <div class="install" id="installBox" hidden>
+        <div class="install__t">装到手机主屏,像 App 一样用</div>
+        <div class="install__b" id="installHow"></div>
+        <div class="install__acts">
+          <button class="btn btn--p" id="installBtn" hidden>立即安装</button>
+          <button class="btn" id="installNo">不用了</button>
+        </div>
+      </div>
 
       <div class="fld">
         <label>识别服务</label>
@@ -1029,8 +1057,53 @@ if(FIRST_RUN && !FILE_MODE){
     + '填完点「测试连接」确认能通,再回去点开始。');
 }
 
+/* ---------- 8. 装到手机主屏(PWA) ---------- */
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+         || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);   // iPadOS 伪装成 Mac
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
+
+// 手机上没有画中画浮窗,把那个按钮整组藏掉,剩下的按钮铺满
+if(!('documentPictureInPicture' in window)) document.body.classList.add('no-pip');
+
+if(window.isSecureContext && 'serviceWorker' in navigator){
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(e=>console.warn('[sw]',e)));
+}
+
+const installBox=$('installBox');
+let deferredInstall=null;
+// 安卓 / 桌面 Chrome 会给安装事件,可以一键装;iOS 不给,只能教用户手动加
+addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredInstall=e;
+  showInstallTip('点下面的「立即安装」,装完桌面会多一个图标。', true);
+});
+function showInstallTip(how, canPrompt){
+  if(STANDALONE) return;                                   // 已经是装好的状态了
+  try{ if(localStorage.getItem('si.installTipOff')==='1') return; }catch(e){}
+  $('installHow').innerHTML=how;
+  $('installBtn').hidden=!canPrompt;
+  installBox.hidden=false;
+}
+$('installBtn').onclick=async()=>{
+  if(!deferredInstall) return;
+  deferredInstall.prompt();
+  try{ await deferredInstall.userChoice; }catch(e){}
+  deferredInstall=null; installBox.hidden=true;
+};
+$('installNo').onclick=()=>{
+  installBox.hidden=true;
+  try{ localStorage.setItem('si.installTipOff','1'); }catch(e){}
+};
+if(IOS && !STANDALONE){
+  // iOS 没有安装事件,只能手动加。Safari 才有「添加到主屏幕」,微信内置浏览器没有。
+  showInstallTip(
+    '点屏幕<b>底部中间的分享按钮</b>(方框向上箭头)→ 往下滑找到 <b>「添加到主屏幕」</b> → 右上角<b>添加</b>。<br>'
+    + '之后从桌面图标打开,就是全屏无地址栏,和 App 一样。<br>'
+    + '注意:必须用 <b>Safari</b> 打开才有这个选项,微信里打开是没有的。', false);
+}
+
 console.log('%c同传前端就绪','color:#2AC3F2;font-weight:bold');
-console.log('当前服务:',PROVIDER_NAME[cfg.provider],'· 中转:',relayURL());
+console.log('当前服务:',PROVIDER_NAME[cfg.provider],'· 中转:',relayURL(),
+            '· iOS:',IOS,'· 已装到主屏:',STANDALONE);
 </script>
 </body>
 </html>
