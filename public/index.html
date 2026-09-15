@@ -54,14 +54,50 @@
   .gear{background:none;border:0;padding:6px;cursor:pointer;color:#6D7C81;display:flex}
   .gear svg{width:clamp(20px,5vw,24px);height:clamp(20px,5vw,24px);stroke:currentColor;fill:none;stroke-width:1.6}
 
+  /* 滚动条要看得见、拖得动 —— 往回翻历史时得有个把手 */
   .pane__body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
-              padding:clamp(6px,1.8vw,12px) 0 clamp(96px,22vw,132px);scrollbar-width:none}
-  .pane__body::-webkit-scrollbar{display:none}
+              padding:clamp(6px,1.8vw,12px) 0 clamp(96px,22vw,132px);
+              scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.26) transparent}
+  .pane__body::-webkit-scrollbar{width:10px}
+  .pane__body::-webkit-scrollbar-track{background:transparent}
+  .pane__body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:99px;
+              border:3px solid transparent;background-clip:content-box}
+  .pane__body::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.4);background-clip:content-box}
   .pane--src .pane__body{padding-bottom:clamp(12px,3vw,20px)}
-  .line{margin:0 0 .5em;font-size:clamp(21px,5.6vw,32px);line-height:1.42;word-break:break-word}
+  .line{margin:0 0 .5em;font-size:clamp(21px,5.6vw,32px);line-height:1.42;word-break:break-word;
+        display:flex;gap:clamp(8px,2vw,12px);align-items:baseline}
   .line--interim{color:var(--interim)}
   .line:last-child{margin-bottom:0}
+  .line__t{flex:1 1 auto;min-width:0}
   .empty{color:#3A4245;font-size:clamp(15px,4vw,19px);line-height:1.6}
+
+  /* 说话人标签,放在每行左边 */
+  .spk{--c:#2AC3F2;flex:none;border:1px solid var(--c);color:var(--c);background:transparent;
+       border-radius:7px;padding:1px 7px;cursor:pointer;font-family:inherit;font-weight:600;
+       font-size:clamp(11px,2.7vw,14px);line-height:1.6;white-space:nowrap;
+       max-width:6.5em;overflow:hidden;text-overflow:ellipsis;align-self:flex-start;
+       margin-top:.28em}
+  .spk:active{background:color-mix(in srgb,var(--c) 22%,transparent)}
+  .spkrow{display:flex;align-items:center;gap:12px;padding:12px 0;
+          border-bottom:1px solid rgba(255,255,255,.07)}
+  .spkrow .dot{flex:none;width:13px;height:13px;border-radius:50%}
+  .spkrow input{flex:1 1 auto;min-width:0;background:#0C1E25;border:1px solid rgba(255,255,255,.13);
+                color:#fff;border-radius:9px;padding:9px 11px;font-size:15px;font-family:inherit;outline:none}
+  .spkrow input:focus{border-color:var(--accent)}
+  .spkrow .meta2{flex:none;font-size:12px;color:#5E7178;width:6.5em;text-align:right;
+                 font-variant-numeric:tabular-nums}
+
+  /* 往回翻的时候,新内容不再把视线拽走,改成在角上提示一下 */
+  .jump{position:absolute;right:clamp(14px,4vw,24px);z-index:4;border:0;cursor:pointer;
+        font-family:inherit;display:none;align-items:center;gap:6px;
+        background:var(--accent);color:#04222c;font-weight:600;
+        border-radius:999px;padding:8px 14px;font-size:clamp(12px,3.2vw,14px);
+        box-shadow:0 6px 20px rgba(0,0,0,.45)}
+  .jump.is-show{display:inline-flex}
+  .jump svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.4;
+            stroke-linecap:round;stroke-linejoin:round}
+  .pane--src .jump{bottom:clamp(10px,2.4vw,16px)}
+  .pane--dst .jump{bottom:clamp(96px,22vw,132px)}
 
   .toast{position:absolute;left:50%;top:50%;z-index:6;border:0;cursor:pointer;font-family:inherit;
          transform:translate(-50%,-50%) scale(.95);background:var(--accent);color:#fff;
@@ -156,11 +192,15 @@
       </div>
     </div>
     <div class="pane__body" id="srcBody"></div>
+    <button class="jump" id="jumpSrc" title="回到最新">
+      <svg viewBox="0 0 24 24"><polyline points="6 10 12 16 18 10"/></svg>回到最新</button>
   </section>
 
   <section class="pane pane--dst">
     <div class="pane__head"><span class="pane__label">翻译文本</span></div>
     <div class="pane__body" id="dstBody"></div>
+    <button class="jump" id="jumpDst" title="回到最新">
+      <svg viewBox="0 0 24 24"><polyline points="6 10 12 16 18 10"/></svg>回到最新</button>
   </section>
 
   <button class="toast" id="toast">收音已暂停,点击重试</button>
@@ -351,11 +391,53 @@
       </div>
 
       <div class="fld">
+        <label>区分说话人</label>
+        <select id="spkOn">
+          <option value="1">开(按音色自动区分,每行左边标出来)</option>
+          <option value="0">关</option>
+        </select>
+        <p class="hint">在浏览器本地按音色聚类,不依赖识别服务。检测到 2 个以上说话人才会显示标签。<br>
+          点任意一个标签可以改简称,比如改成「张总」「客户」。</p>
+      </div>
+
+      <div class="fld">
+        <label>预计人数</label>
+        <select id="spkMax">
+          <option value="0">自动(最多 6 人)</option>
+          <option value="2">2 人</option>
+          <option value="3">3 人</option>
+          <option value="4">4 人</option>
+          <option value="5">5 人</option>
+        </select>
+        <p class="hint">知道有几个人就定死,比让它自己猜准得多 —— 不会把同一个人的高低起伏拆成两个。</p>
+      </div>
+
+      <div class="fld">
         <label>断句静音阈值(毫秒)</label>
         <input id="endSil" type="number" min="200" max="3000" step="100" placeholder="800">
         <p class="hint">说话人停顿超过这个时长就把当前句定稿。调小出字更碎更快,调大更完整但延迟高。</p>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ===== 说话人 ===== -->
+  <div class="sheet" id="spkSheet">
+    <div class="sheet__bar">
+      <span class="sheet__title">说话人 <span id="spkCount" style="color:#93A6AB;font-size:14px"></span></span>
+      <div class="sheet__acts">
+        <button class="btn" id="spkResetBtn">重新识别</button>
+        <button class="btn btn--p" id="spkClose">完成</button>
+      </div>
+    </div>
+    <div class="sheet__body">
+      <p class="note">
+        靠<b>音色</b>(基频 + 过零率)在浏览器本地区分,不依赖识别服务 ——
+        阿里云所有实时模型都不提供说话人标签。<br>
+        男女声、音高差得开的人分得比较准;<b>声音接近的人会被并成一个</b>,这是这种做法的上限。
+        分错了就点「重新识别」重来,或者在设置里把「预计人数」定死。
+      </p>
+      <div id="spkBody"></div>
     </div>
   </div>
 
@@ -420,12 +502,38 @@ class PcmTap extends AudioWorkletProcessor{
     const p=(o&&o.processorOptions)||{};
     this.step=sampleRate/(p.targetRate||16000);   // sampleRate 是 worklet 全局量
     this.n=p.frameSamples||640;
+    this.rate=p.targetRate||16000;
     this.pos=0; this.tail=new Float32Array(0); this.acc=new Int16Array(0); this.on=true;
+    this.fbuf=new Float32Array(0); this.fc=0; this.feat=!!p.voiceFeat;
     this.port.onmessage=e=>{
       const m=e.data||{};
       if(m.cmd==='gate') this.on=!!m.on;
-      if(m.cmd==='reset'){ this.tail=new Float32Array(0); this.acc=new Int16Array(0); this.pos=0; }
+      if(m.cmd==='feat') this.feat=!!m.on;
+      if(m.cmd==='reset'){ this.tail=new Float32Array(0); this.acc=new Int16Array(0);
+                           this.fbuf=new Float32Array(0); this.pos=0; }
     };
+  }
+
+  /* 音色特征:基频 + 过零率。用来在浏览器端区分说话人 ——
+     上游的流式接口大多不给说话人标签,只能自己从声音里算。
+     两个特征都很便宜,跑在音频线程上不会卡。 */
+  voiceFeat(x){
+    const n=x.length;
+    let e=0, zc=0;
+    for(let i=0;i<n;i++){ e+=x[i]*x[i]; if(i&&((x[i]>=0)!==(x[i-1]>=0))) zc++; }
+    const rms=Math.sqrt(e/n);
+    if(rms<0.012) return null;                       // 太安静,不是在说话
+    // 自相关求基频,只搜 80~400Hz(16k 采样下对应 lag 40~200)
+    const lo=Math.floor(this.rate/400), hi=Math.floor(this.rate/80);
+    let best=0, bestLag=0;
+    for(let lag=lo;lag<=hi&&lag<n;lag++){
+      let sum=0;
+      for(let i=lag;i<n;i++) sum+=x[i]*x[i-lag];
+      if(sum>best){ best=sum; bestLag=lag; }
+    }
+    // 自相关峰值太低说明是清音或噪声,基频不可信,宁可不报
+    if(!bestLag || e<=0 || best/e<0.30) return null;
+    return { f0:this.rate/bestLag, zcr:zc/n, rms };
   }
   process(inputs){
     if(!this.on) return true;
@@ -450,6 +558,21 @@ class PcmTap extends AudioWorkletProcessor{
       o+=this.n;
     }
     this.acc=a.slice(o);
+
+    // 音色特征单独攒一段再算 —— 一帧 40ms 才够看清基频,而且隔帧算一次就够
+    if(this.feat){
+      const g=new Float32Array(this.fbuf.length+out.length);
+      g.set(this.fbuf,0); g.set(Float32Array.from(out),this.fbuf.length);
+      let k=0;
+      while(g.length-k>=this.n){
+        if((this.fc++ & 1)===0){
+          const v=this.voiceFeat(g.subarray(k,k+this.n));
+          if(v) this.port.postMessage({f:v});
+        }
+        k+=this.n;
+      }
+      this.fbuf=g.slice(k);
+    }
     return true;
   }
 }
@@ -457,7 +580,7 @@ registerProcessor('pcm-tap',PcmTap);`;
 
 class Mic{
   constructor(){ this.on=false; }
-  async start(onFrame){
+  async start(onFrame, onFeat){
     // iOS 要求 AudioContext 在用户手势的同一个同步栈里创建,所以放在 await 之前
     const AC = window.AudioContext || window.webkitAudioContext;
     if(!AC) throw new Error('NO_AUDIO');
@@ -479,8 +602,13 @@ class Mic{
       const u=URL.createObjectURL(new Blob([WORKLET],{type:'application/javascript'}));
       await this.ctx.audioWorklet.addModule(u); URL.revokeObjectURL(u);
       this.node=new AudioWorkletNode(this.ctx,'pcm-tap',
-        { processorOptions:{ targetRate:TARGET_RATE, frameSamples:FRAME_SAMPLE } });
-      this.node.port.onmessage=e=>{ if(this.on) emit(e.data); };
+        { processorOptions:{ targetRate:TARGET_RATE, frameSamples:FRAME_SAMPLE, voiceFeat:!!onFeat } });
+      // 音频帧走 ArrayBuffer(转移所有权),音色特征走普通对象,按类型分流
+      this.node.port.onmessage=e=>{
+        if(!this.on) return;
+        if(e.data instanceof ArrayBuffer) emit(e.data);
+        else if(e.data && e.data.f && onFeat) onFeat(e.data.f);
+      };
       ok=true; this.mode='AudioWorklet';
     }catch(e){ console.warn('[mic] AudioWorklet 不可用,回退 ScriptProcessor',e); }
     if(!ok){
@@ -504,6 +632,7 @@ class Mic{
     console.log('[mic] %s · %dHz → %dHz · 每帧 %d 字节', this.mode, this.ctx.sampleRate, TARGET_RATE, FRAME_SAMPLE*2);
   }
   gate(on){ try{ this.node && this.node.port && this.node.port.postMessage({cmd:'gate',on}); }catch(e){} }
+  featOn(on){ try{ this.node && this.node.port && this.node.port.postMessage({cmd:'feat',on}); }catch(e){} }
   pause(){ this.on=false; this.gate(false); }
   resume(){ this.on=true; this.gate(true);
     try{ this.node && this.node.port && this.node.port.postMessage({cmd:'reset'}); }catch(e){}
@@ -542,7 +671,8 @@ const cfg = Object.assign({
   aliMode:'model', aliLLMModel:'qwen-flash', aliLLMBase:EP.aliLLM, aliVocab:'',
   vcApp:'', vcTok:'', vcRes:'volc.bigasr.sauc.duration', vcLang:'en-US', vcEp:EP.volc,
   arkKey:'', arkModel:'doubao-seed-1-6-flash-250828', arkBase:EP.ark,
-  relay:'', endSil:800
+  relay:'', endSil:800,
+  spk:1, spkMax:0, spkNames:{}
 }, (()=>{ try{ return JSON.parse(localStorage.getItem(CFG_KEY)||'{}'); }catch(e){ return {}; } })());
 // 第一次打开(还没存过配置)时自动弹设置面板。
 // 否则默认是演示模式,用户点了开始看到一堆假字幕,还以为部署坏了。
@@ -714,16 +844,99 @@ const HINT = () =>
    ? '当前为演示模式,点「开始」即可预览效果。<br>要用真实识别,点右上角齿轮填入密钥。'
    : '点击下方「开始」进行收音';
 
+/* ---------- 说话人分离(浏览器本地,按音色聚类)----------
+ * 为什么不用上游的:阿里云所有实时模型都不提供说话人分离(只有录音文件模型有);
+ * 火山的双向流式虽然支持,但参数名我没法在这儿核实,猜错了就是白等。
+ * 所以从声音本身算:基频(男女、音高差异)+ 过零率(音色明暗),在线聚类。
+ * 上游要是给了说话人标签,优先用它 —— 见 wire() 里的 f.spk。
+ *
+ * 能力边界说在前面:音高差得开的人分得准,声音接近的会被并成一个。
+ * 这是纯靠这两个特征的上限,想更准得上声纹模型,那是另一个量级的东西。 */
+const SPK_COLORS=['#2AC3F2','#F2A93B','#7ED957','#F26D9B','#B08CF2','#5BD6C4'];
+const SPK={ list:[], feats:[] };
+
+const spkName  = id => (cfg.spkNames&&cfg.spkNames[id]) || String.fromCharCode(64+id);   // A B C…
+const spkColor = id => SPK_COLORS[(id-1)%SPK_COLORS.length];
+const spkLimit = () => Number(cfg.spkMax)>0 ? Number(cfg.spkMax) : SPK_COLORS.length;
+// 只有真的听出两个人才显示标签,一个人说话时不该平白多一列
+const spkVisible = () => !!Number(cfg.spk) && SPK.list.length>=2;
+
+function spkFeed(f){ if(SPK.feats.length<800) SPK.feats.push(f); }
+
+const med=a=>{ const b=a.slice().sort((x,y)=>x-y); return b[b.length>>1]; };
+// 基频取对数:人耳和说话人差异都是按比例来的,不是按赫兹差
+const spkVec = fs => [ Math.log(med(fs.map(x=>x.f0))), med(fs.map(x=>x.zcr))*6 ];
+// 基频是主要依据,过零率只做辅助,权重压到一半
+const spkDist=(a,b)=>Math.hypot(a[0]-b[0],(a[1]-b[1])*0.5);
+const SPK_TH=0.20;                       // 约 4 个半音,再大就把不同人并了
+
+function spkAssign(){
+  const fs=SPK.feats.splice(0);
+  if(fs.length<5) return null;           // 采样太少判不准,宁可不标也别标错
+  const v=spkVec(fs);
+  let best=null,bd=1e9;
+  for(const sp of SPK.list){ const d=spkDist(v,sp.v); if(d<bd){ bd=d; best=sp; } }
+  // 用户明确说了有几个人、而目前还没凑够的时候,把阈值收紧,更愿意分出新的人。
+  // 否则「预计人数」就只是个上限,对两个声音接近的人毫无帮助 —— 那就是在骗人。
+  const th = (Number(cfg.spkMax)>0 && SPK.list.length<spkLimit()) ? SPK_TH*0.6 : SPK_TH;
+  if(best && bd<th){
+    best.v=[best.v[0]*0.8+v[0]*0.2, best.v[1]*0.8+v[1]*0.2];   // 滑动平均,慢慢收敛
+    best.n++; best.f0=Math.exp(best.v[0]);
+    return best.id;
+  }
+  if(SPK.list.length>=spkLimit()) return best?best.id:null;     // 到上限就归给最接近的
+  const id=SPK.list.length+1;
+  SPK.list.push({ id, v, n:1, f0:Math.exp(v[0]) });
+  return id;
+}
+function spkReset(){ SPK.list.length=0; SPK.feats.length=0; renderSpk(); render(); }
+
+/* ---------- 滚动:只有停在底部时才跟着新内容走 ----------
+ * 以前每次渲染都无条件拽到底,往回翻历史根本看不成。
+ * 现在记住每个面板是不是"贴着底",只有贴底才自动跟;
+ * 一旦往上翻就交出控制权,右下角冒出「回到最新」。 */
+const STICK_PX = 48;                       // 离底部这么近就算贴着底
+const atBottom = el => el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_PX;
+const stick = { srcBody:true, dstBody:true };
+
+function bindScroll(el, btn){
+  const sync=()=>{
+    stick[el.id] = atBottom(el);
+    btn.classList.toggle('is-show', !stick[el.id] && el.scrollHeight > el.clientHeight + 4);
+  };
+  el.addEventListener('scroll', sync, {passive:true});
+  btn.onclick=()=>{ el.scrollTo({top:el.scrollHeight, behavior:'smooth'});
+                    stick[el.id]=true; btn.classList.remove('is-show'); };
+  return sync;
+}
+const syncSrc=bindScroll(srcBody,$('jumpSrc')), syncDst=bindScroll(dstBody,$('jumpDst'));
+
+/* 一行 = 左边说话人标签 + 右边文字。没开或只有一个人时不占那一列。 */
+function lineHTML(r,k,interim){
+  const tag = (spkVisible() && r.spk)
+    ? '<button class="spk" data-s="'+r.spk+'" style="--c:'+spkColor(r.spk)+'" '
+      +'title="点一下改简称">'+esc(spkName(r.spk))+'</button>'
+    : '';
+  return '<p class="line'+(interim?' line--interim':'')+'">'+tag
+       + '<span class="line__t">'+esc(r[k]||'')+'</span></p>';
+}
+
 function render(){
   const rows=k=>{
-    let h=S.history.map(r=>'<p class="line">'+esc(r[k])+'</p>').join('');
-    if(S.partial[k]) h+='<p class="line line--interim">'+esc(S.partial[k])+'</p>';
+    let h=S.history.map(r=>lineHTML(r,k,false)).join('');
+    if(S.partial[k]) h+=lineHTML(S.partial,k,true);
     return h;
   };
   const s=rows('src');
+  // 重绘会丢掉滚动位置,先存后还
+  const keep=[[srcBody,srcBody.scrollTop],[dstBody,dstBody.scrollTop]];
   srcBody.innerHTML = s || '<p class="empty">'+HINT()+'</p>';
   dstBody.innerHTML = rows('dst');
-  srcBody.scrollTop=srcBody.scrollHeight; dstBody.scrollTop=dstBody.scrollHeight;
+  for(const [el,top] of keep){
+    if(stick[el.id]) el.scrollTop = el.scrollHeight;
+    else el.scrollTop = top;
+  }
+  syncSrc(); syncDst();
   // 字幕是持续累积的,禁用态必须跟着每次渲染重算,不能只在开始/暂停时算一次
   btnClear.disabled=!S.history.length&&!S.partial.src&&!S.partial.dst;
   btnDone.disabled=!S.running&&S.history.length===0;
@@ -773,8 +986,15 @@ const cv=$('meter'), c2=cv.getContext('2d'); const BARS=5; let bars=new Array(BA
 
 function wire(s){
   s.onPartial=p=>{ S.partial={src:p.src||'',dst:p.dst||''}; render(); };
-  s.onFinal=f=>{ if(f.src||f.dst) S.history.push({src:f.src||'',dst:f.dst||''});
-                 S.partial={src:'',dst:''}; render(); };
+  s.onFinal=f=>{
+    if(f.src||f.dst){
+      // 上游给了说话人标签就直接用(火山双向流式支持);没给就用本地音色聚类
+      const spk = f.spk!=null ? Number(f.spk)+1 : (Number(cfg.spk)?spkAssign():null);
+      S.history.push({src:f.src||'',dst:f.dst||'',spk});
+      if(spkSheet.classList.contains('is-show')) renderSpk();
+    } else SPK.feats.length=0;
+    S.partial={src:'',dst:''}; render();
+  };
   s.onState=(st,msg)=>{
     if(st==='running'){ S.reconnecting=false; hideToast(); setMeta(); }
     // 重连不算出错:麦克风继续开着,已有字幕保留,只在顶部标一下状态。
@@ -798,7 +1018,9 @@ async function start(){
     }
     try{
       mic=new Mic();
-      await mic.start(f=>{ if(source&&!S.paused) source.sendAudio(f); });
+      await mic.start(
+        f=>{ if(source&&!S.paused) source.sendAudio(f); },
+        Number(cfg.spk) ? v=>{ if(!S.paused) spkFeed(v); } : null);
     }catch(e){
       console.error(e); mic=null;
       const n=(e&&e.name)||String(e&&e.message);
@@ -850,7 +1072,7 @@ btnClear.onclick=()=>{
     return;
   }
   disarmClear();
-  S.history.length=0; S.partial={src:'',dst:''};
+  S.history.length=0; S.partial={src:'',dst:''}; SPK.feats.length=0;
   render(); syncRun(); setMeta(); paintPip();
   flash('已清空');
 };
@@ -875,7 +1097,9 @@ btnPip.onclick=async()=>{
 function paintPip(){
   if(!pipWin||pipWin.closed) return;
   const box=pipWin.document.getElementById('p'); if(!box) return;
-  box.innerHTML=S.history.slice(-3).map(r=>'<p>'+esc(r.dst)+'</p>').join('')
+  box.innerHTML=S.history.slice(-3).map(r=>'<p>'
+      +(spkVisible()&&r.spk?'<b style="color:'+spkColor(r.spk)+'">'+esc(spkName(r.spk))+'</b> ':'')
+      +esc(r.dst)+'</p>').join('')
     +(S.partial.dst?'<p class="i">'+esc(S.partial.dst)+'</p>':'');
 }
 
@@ -886,7 +1110,7 @@ const F={provider:$('provider'),
   aliLLMModel:$('aliLLMModel'),aliLLMBase:$('aliLLMBase'),aliVocab:$('aliVocab'),
   vcApp:$('vcApp'),vcTok:$('vcTok'),vcRes:$('vcRes'),vcLang:$('vcLang'),vcEp:$('vcEp'),
   arkKey:$('arkKey'),arkModel:$('arkModel'),arkBase:$('arkBase'),
-  relay:$('relay'),endSil:$('endSil')};
+  relay:$('relay'),endSil:$('endSil'),spkOn:$('spkOn'),spkMax:$('spkMax')};
 
 /* 控制台给的「API Host」只是个主机名,这里补全协议和路径,
    用户直接粘贴就能用,不用自己拼 wss:// 和 /api-ws/v1/inference。 */
@@ -913,6 +1137,8 @@ function normHttp(v, defPath){
 function collect(){
   const o={};
   for(const k in F) o[k]= k==='endSil' ? (Number(F[k].value)||800) : F[k].value.trim();
+  o.spk=Number(F.spkOn.value)?1:0; o.spkMax=Number(F.spkMax.value)||0;
+  delete o.spkOn; delete o.spkMax_;
   o.aliEp      = normWs(o.aliEp,'/api-ws/v1/inference')          || EP.aliBJ;
   o.vcEp       = normWs(o.vcEp,'/api/v3/sauc/bigmodel')          || EP.volc;
   o.aliLLMBase = normHttp(o.aliLLMBase,'/compatible-mode/v1')    || EP.aliLLM;
@@ -924,7 +1150,12 @@ function collect(){
     .forEach(k=>{ F[k].value=o[k]; });
   return o;
 }
-function fillForm(){ for(const k in F) F[k].value = cfg[k] ?? ''; syncGroups(); }
+function fillForm(){
+  for(const k in F) F[k].value = cfg[k] ?? '';
+  F.spkOn.value = String(Number(cfg.spk)?1:0);
+  F.spkMax.value = String(Number(cfg.spkMax)||0);
+  syncGroups();
+}
 function syncGroups(){
   const p=F.provider.value;
   $('grpAli').hidden  = p!=='aliyun';
@@ -976,8 +1207,11 @@ $('btnSet').onclick=()=>{
   setSheet.classList.add('is-show');
 };
 $('setSave').onclick=()=>{
+  const wasMax=Number(cfg.spkMax);
   Object.assign(cfg, collect());
   saveCfg(); setSheet.classList.remove('is-show');
+  mic && mic.featOn(!!Number(cfg.spk));
+  if(Number(cfg.spkMax)!==wasMax) spkReset();     // 改了人数上限,之前分的就不作数了
   if(S.running){ stopAll(); flash('设置已保存,重新点「开始」生效'); }
   else { setMeta(); render(); flash('已保存 · ' + PROVIDER_NAME[cfg.provider]); }
 };
@@ -986,17 +1220,54 @@ $('setClear').onclick=()=>{
   saveCfg(); setProbe('wait','密钥已清空。');
 };
 
+/* ---------- 5b. 说话人面板 ---------- */
+const spkSheet=$('spkSheet');
+function renderSpk(){
+  $('spkCount').textContent = SPK.list.length ? '· 已识别 '+SPK.list.length+' 人' : '';
+  $('spkBody').innerHTML = SPK.list.length
+    ? SPK.list.map(sp=>
+        '<div class="spkrow">'
+        +'<span class="dot" style="background:'+spkColor(sp.id)+'"></span>'
+        +'<input data-id="'+sp.id+'" maxlength="8" placeholder="'+String.fromCharCode(64+sp.id)+'" '
+        +'value="'+esc((cfg.spkNames&&cfg.spkNames[sp.id])||'')+'">'
+        +'<span class="meta2">'+Math.round(sp.f0)+' Hz · '+sp.n+' 句</span>'
+        +'</div>').join('')
+    : '<p style="color:#5E6E73">还没识别到说话人。开始收音、有人说过话之后这里才会出现。</p>';
+  $('spkBody').querySelectorAll('input').forEach(inp=>{
+    inp.oninput=()=>{
+      const id=inp.dataset.id, v=inp.value.trim();
+      cfg.spkNames=cfg.spkNames||{};
+      if(v) cfg.spkNames[id]=v; else delete cfg.spkNames[id];
+      saveCfg(); render();
+    };
+  });
+}
+function openSpk(){ renderSpk(); spkSheet.classList.add('is-show'); }
+$('spkClose').onclick=()=>spkSheet.classList.remove('is-show');
+$('spkResetBtn').onclick=()=>{ spkReset(); flash('已重新开始识别说话人'); };
+// 点行首那个标签就能改简称
+document.addEventListener('click',e=>{
+  const c=e.target.closest('.spk'); if(!c) return;
+  openSpk();
+  setTimeout(()=>{ const i=$('spkBody').querySelector('input[data-id="'+c.dataset.s+'"]');
+                   if(i){ i.focus(); i.select(); } },60);
+});
+
 /* ---------- 6. 记录导出 ---------- */
 btnDone.onclick=()=>{
   stopAll();
   $('recCount').textContent='· '+S.history.length+' 句';
   $('recBody').innerHTML = S.history.length
-    ? S.history.map(r=>'<div class="rec"><b>'+esc(r.src)+'</b><span>'+esc(r.dst)+'</span></div>').join('')
+    ? S.history.map(r=>'<div class="rec">'
+        +(spkVisible()&&r.spk?'<b style="color:'+spkColor(r.spk)+';font-weight:600">'
+           +esc(spkName(r.spk))+'</b> ':'')
+        +'<b>'+esc(r.src)+'</b><span>'+esc(r.dst)+'</span></div>').join('')
     : '<p style="color:#5E6E73">这次没有记录到内容。</p>';
   recSheet.classList.add('is-show');
 };
 $('btnBack').onclick=()=>recSheet.classList.remove('is-show');
-const asText=()=>S.history.map(r=>r.src+'\n'+r.dst).join('\n\n');
+const asText=()=>S.history.map(r=>
+  (spkVisible()&&r.spk?'['+spkName(r.spk)+'] ':'')+r.src+'\n'+r.dst).join('\n\n');
 $('btnCopy').onclick=async()=>{
   const b=$('btnCopy');
   try{ await navigator.clipboard.writeText(asText()); b.textContent='已复制'; }
@@ -1019,7 +1290,8 @@ $('btnSave').onclick=()=>{
 /* ---------- 7. 杂项 ---------- */
 document.addEventListener('keydown',e=>{
   if(e.code==='Space'&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){ e.preventDefault(); btnRun.click(); }
-  if(e.key==='Escape'){ recSheet.classList.remove('is-show'); setSheet.classList.remove('is-show'); }
+  if(e.key==='Escape'){ recSheet.classList.remove('is-show'); setSheet.classList.remove('is-show');
+                        spkSheet.classList.remove('is-show'); }
 });
 window.addEventListener('pagehide',stopAll);
 
