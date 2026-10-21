@@ -72,11 +72,11 @@
   .empty{color:#3A4245;font-size:clamp(15px,4vw,19px);line-height:1.6}
 
   /* 说话人标签,放在每行左边 */
-  .spk{--c:#2AC3F2;flex:none;border:1px solid var(--c);color:var(--c);background:transparent;
-       border-radius:7px;padding:1px 7px;cursor:pointer;font-family:inherit;font-weight:600;
-       font-size:clamp(11px,2.7vw,14px);line-height:1.6;white-space:nowrap;
-       max-width:6.5em;overflow:hidden;text-overflow:ellipsis;align-self:flex-start;
-       margin-top:.28em}
+  .spk{--c:#2AC3F2;flex:none;border:1px solid var(--c);color:var(--c);background:color-mix(in srgb,var(--c) 8%,transparent);
+        border-radius:7px;padding:1px 7px;cursor:pointer;font-family:inherit;font-weight:600;
+        font-size:clamp(11px,2.7vw,14px);line-height:1.6;white-space:nowrap;
+        max-width:8em;overflow:hidden;text-overflow:ellipsis;align-self:flex-start;
+        margin-top:.28em}
   .spk:active{background:color-mix(in srgb,var(--c) 22%,transparent)}
   .spkrow{display:flex;align-items:center;gap:12px;padding:12px 0;
           border-bottom:1px solid rgba(255,255,255,.07)}
@@ -130,9 +130,13 @@
 
   /* 设置 / 记录 —— 共用的全屏面板 */
   .sheet{position:absolute;inset:0;z-index:10;background:#050F13;display:none;flex-direction:column;
-         padding:calc(clamp(18px,5vw,34px) + env(safe-area-inset-top,0px)) clamp(18px,5vw,34px)
-                 calc(clamp(18px,5vw,34px) + var(--safe-b))}
+          padding:calc(clamp(18px,5vw,34px) + env(safe-area-inset-top,0px)) clamp(18px,5vw,34px)
+                  calc(clamp(18px,5vw,34px) + var(--safe-b))}
   .sheet.is-show{display:flex}
+  #zh2enSheet{position:fixed;top:50%;right:16px;transform:translateY(-50%);z-index:300;
+              width:340px;max-width:calc(100vw - 32px);background:#0a151b;
+              border:1px solid rgba(255,255,255,.1);border-radius:14px;
+              box-shadow:0 8px 32px rgba(0,0,0,.5);padding:16px}
   .sheet__bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
   .sheet__title{font-size:clamp(17px,4.4vw,21px)}
   .sheet__acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
@@ -174,15 +178,143 @@
   .rec{padding:13px 0;border-bottom:1px solid rgba(255,255,255,.06)}
   .rec b{display:block;font-weight:400;color:#93A6AB;font-size:clamp(14px,3.6vw,16px);margin-bottom:5px}
   .rec span{display:block;font-size:clamp(16px,4.2vw,19px);line-height:1.5}
+
+  /* 单词悬停翻译 */
+  .line__t .w{cursor:pointer;border-bottom:1px dashed rgba(42,195,242,.3);transition:background .15s;
+              border-radius:3px;padding:0 1px}
+  .line__t .w:hover{background:rgba(42,195,242,.15)}
+  .word-tip{position:fixed;background:#1a2e35;border:1px solid rgba(42,195,242,.4);
+            border-radius:8px;padding:6px 10px;font-size:14px;color:#fff;
+            pointer-events:none;z-index:200;max-width:260px;line-height:1.5;
+            box-shadow:0 4px 16px rgba(0,0,0,.5);opacity:0;transition:opacity .15s}
+  .word-tip.is-show{opacity:1}
+
+  /* 语言方向指示 */
+  .lang-dir{font-size:clamp(11px,2.8vw,13px);color:rgba(255,255,255,.35);
+            font-weight:400;margin-left:6px}
+
+  /* 单词收藏面板 */
+  .fav{position:fixed;top:0;right:0;bottom:0;width:280px;max-width:85vw;
+       background:#0a151b;border-left:1px solid rgba(255,255,255,.07);
+       z-index:50;display:flex;flex-direction:column;transform:translateX(100%);
+       transition:transform .3s ease;box-shadow:-8px 0 24px rgba(0,0,0,.5)}
+  .fav.is-open{transform:translateX(0)}
+  .fav__head{flex:none;display:flex;align-items:center;justify-content:space-between;
+             padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .fav__title{font-size:15px;font-weight:600;color:#fff}
+  .fav__count{font-size:12px;color:rgba(255,255,255,.4);margin-left:8px}
+  .fav__close{background:none;border:0;padding:4px;color:rgba(255,255,255,.5);cursor:pointer}
+  .fav__close:hover{color:#fff}
+  .fav__body{flex:1;overflow-y:auto;padding:12px 16px}
+  .fav__empty{color:rgba(255,255,255,.45);font-size:14px;text-align:center;padding:40px 0}
+  .fav__list{display:flex;flex-direction:column;gap:10px}
+  .fav__item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);
+             border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;
+             transition:background .15s}
+  .fav__item:hover{background:rgba(42,195,242,.08)}
+  .fav__word{font-size:26px;font-weight:600;color:#2ac3f2;word-break:break-all}
+  .fav__trans{font-size:20px;color:rgba(255,255,255,.85);line-height:1.6}
+  .fav__meta{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.4)}
+  .fav__del{background:none;border:0;padding:4px;color:rgba(255,255,255,.35);cursor:pointer}
+  .fav__del:hover{color:#f66}
+  .fav__speak{background:none;border:0;padding:6px;color:rgba(255,255,255,.5);cursor:pointer;border-radius:6px;transition:all .15s}
+  .fav__speak:hover{color:#2ac3f2;background:rgba(42,195,242,.15)}
+  .fav__toggle{position:fixed;left:16px;top:50%;transform:translateY(-50%);
+                width:44px;height:44px;border-radius:50%;border:2px solid rgba(42,195,242,.4);
+                background:#0d1d26;color:#2ac3f2;cursor:pointer;z-index:49;
+                display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  .fav__toggle:hover{border-color:rgba(42,195,242,.8);background:#122830}
+  .fav__toggle svg{width:20px;height:20px;stroke:currentColor}
+  .fav.is-open~.fav__toggle{display:none}
+
+  .hist{position:fixed;top:0;right:0;bottom:0;width:320px;max-width:85vw;
+        background:#0a151b;border-left:1px solid rgba(255,255,255,.07);
+        z-index:50;display:flex;flex-direction:column;transform:translateX(100%);
+        transition:transform .3s ease;box-shadow:-8px 0 24px rgba(0,0,0,.5)}
+  .hist.is-open{transform:translateX(0)}
+  .hist__head{flex:none;display:flex;align-items:center;justify-content:space-between;
+              padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .hist__title{font-size:15px;font-weight:600;color:#fff}
+  .hist__count{font-size:12px;color:rgba(255,255,255,.4);margin-left:8px}
+  .hist__close{background:none;border:0;padding:4px;color:rgba(255,255,255,.5);cursor:pointer}
+  .hist__close:hover{color:#fff}
+  .hist__body{flex:1;overflow-y:auto;padding:12px 16px}
+  .hist__tab{flex:1;padding:10px 0;font-size:13px;color:rgba(255,255,255,.45);cursor:pointer;
+             background:none;border:none;border-bottom:2px solid transparent;font-family:inherit;
+             transition:color .15s,border-color .15s}
+  .hist__tab:hover{color:rgba(255,255,255,.7)}
+  .hist__tab.is-active{color:#2ac3f2;border-bottom-color:#2ac3f2}
+  .hist__empty{color:rgba(255,255,255,.45);font-size:14px;text-align:center;padding:40px 0}
+  .hist__list{display:flex;flex-direction:column;gap:12px}
+  .hist__item{position:relative;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);
+              border-radius:10px;padding:14px 38px 14px 14px;display:flex;flex-direction:column;gap:8px}
+  .hist__item:hover{background:rgba(42,195,242,.06)}
+  .hist__del{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:6px;
+             background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+             color:rgba(255,255,255,.45);font-size:15px;line-height:1;cursor:pointer;
+             display:flex;align-items:center;justify-content:center;font-family:inherit;
+             opacity:0;transition:opacity .15s}
+  .hist__item:hover .hist__del{opacity:1}
+  .hist__del:hover{color:#ff7b7b;border-color:rgba(255,123,123,.4);background:rgba(255,123,123,.08)}
+  .hist__src{font-size:15px;color:rgba(255,255,255,.75);line-height:1.5;word-break:break-word}
+  .hist__dst{font-size:17px;color:#fff;line-height:1.5;word-break:break-word}
+  .hist__meta{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.35)}
+  .hist__spk{display:inline-flex;align-items:center;justify-content:center;
+             width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:600;
+             border:1px solid var(--c);color:var(--c)}
+  .hist__toggle{position:fixed;left:16px;top:calc(50% + 56px);transform:translateY(-50%);
+                width:44px;height:44px;border-radius:50%;border:2px solid rgba(42,195,242,.4);
+                background:#0d1d26;color:#2ac3f2;cursor:pointer;z-index:49;
+                display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  .hist__toggle:hover{border-color:rgba(42,195,242,.5);background:#0d1d26}
+  .hist__toggle svg{width:18px;height:18px;stroke:currentColor}
+  .hist.is-open~.hist__toggle{display:none}
 </style>
 </head>
 <body>
 <div id="app">
 
+  <!-- 单词收藏面板 -->
+  <aside class="fav" id="favPanel" aria-label="单词收藏">
+    <div class="fav__head">
+      <span class="fav__title">生词本 <span class="fav__count" id="favCount">0</span></span>
+      <button class="fav__close" id="favClose" aria-label="关闭">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="fav__body" id="favBody">
+      <p class="fav__empty" id="favEmpty">暂无收藏单词，点击对话中的单词可收藏</p>
+      <div class="fav__list" id="favList"></div>
+    </div>
+  </aside>
+  <button class="fav__toggle" id="favToggle" aria-label="打开生词本" title="生词本">
+    <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 8h8"/><path d="M8 12h5"/></svg>
+  </button>
+
+  <aside class="hist" id="histPanel" aria-label="历史记录">
+    <div class="hist__head">
+      <span class="hist__title">历史 <span class="hist__count" id="histCount">0</span></span>
+      <button class="hist__close" id="histClose" aria-label="关闭">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="flex:none;display:flex;border-bottom:1px solid rgba(255,255,255,.07)">
+      <button id="histTabLive" class="hist__tab is-active">实时翻译</button>
+      <button id="histTabZh2en" class="hist__tab">中译英</button>
+    </div>
+    <div class="hist__body" id="histBody">
+      <p class="hist__empty" id="histEmpty">暂无历史记录</p>
+      <div class="hist__list" id="histList"></div>
+    </div>
+  </aside>
+  <button class="hist__toggle" id="histToggle" aria-label="打开历史记录" title="历史">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+  </button>
+
   <section class="pane pane--src">
     <div class="meta" id="meta">未开始</div>
     <div class="pane__head">
-      <span class="pane__label">识别文本</span>
+      <span class="pane__label">识别文本 <span class="lang-dir" id="srcLangDir"></span></span>
       <div class="head-right">
         <canvas class="meter" id="meter" width="112" height="44"></canvas>
         <button class="lang" id="langBtn">英 <span style="opacity:.6">&#8594;</span> 中</button>
@@ -197,20 +329,37 @@
   </section>
 
   <section class="pane pane--dst">
-    <div class="pane__head"><span class="pane__label">翻译文本</span></div>
+    <div class="pane__head"><span class="pane__label">翻译文本 <span class="lang-dir" id="dstLangDir"></span></span></div>
     <div class="pane__body" id="dstBody"></div>
     <button class="jump" id="jumpDst" title="回到最新">
       <svg viewBox="0 0 24 24"><polyline points="6 10 12 16 18 10"/></svg>回到最新</button>
   </section>
 
   <button class="toast" id="toast">收音已暂停,点击重试</button>
+  <div class="word-tip" id="wordTip"></div>
+
+  <button id="zh2enFab" style="position:fixed;right:16px;top:calc(50% + 56px);transform:translateY(-50%);z-index:299;width:44px;height:44px;border-radius:50%;background:var(--accent);border:none;color:#04222c;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font-family:inherit">译</button>
+  <div id="zh2enSheet" style="display:none">
+    <div id="zh2enDrag" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;cursor:move;user-select:none;-webkit-user-select:none">
+      <span style="font-size:17px;font-weight:600">中译英</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn--p" id="zh2enGo" style="padding:6px 12px;font-size:13px">翻译</button>
+        <button id="zh2enClose" style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:#dfe9ec;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">&times;</button>
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <textarea id="zh2enInput" rows="3" placeholder="输入中文…" style="width:100%;background:#0C1E25;border:1px solid rgba(255,255,255,.13);color:#fff;border-radius:10px;padding:10px 12px;font-size:15px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div>
+      <div id="zh2enOutput" style="background:#0C1E25;border:1px solid rgba(255,255,255,.13);border-radius:10px;padding:10px 12px;font-size:15px;min-height:50px;color:#dfe9ec;line-height:1.5">翻译结果会显示在这里…</div>
+    </div>
+  </div>
 
   <div class="dock">
     <div class="dock__grp">
       <button class="dock__btn" id="btnPip">
         <svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><rect x="12" y="11.5" width="8" height="6.5" rx="1.5"/><polyline points="9 11 5 7"/><polyline points="5 7 8.5 7"/><polyline points="5 7 5 10.5"/></svg>
-        开启浮窗
-      </button>
+        </button>
     </div>
     <div class="dock__grp">
       <button class="dock__btn" id="btnRun">
@@ -261,13 +410,12 @@
           <option value="aliyun">阿里云百炼 Gummy · 识别+翻译一步到位</option>
           <option value="volc">火山引擎 大模型流式识别 + 豆包翻译</option>
         </select>
-        <p class="hint">阿里云那条链路里翻译是模型自带的,延迟最低;火山这条是先识别、再让豆包翻,可控性更高。</p>
+        <p class="hint">阿里云那条链路里翻译是模型自带的,延迟最低。火山这条是先识别、再让豆包翻,可控性更高。</p>
       </div>
 
       <p class="note">
         密钥只存在这台设备的浏览器里(localStorage),开始收音时通过 WSS 发给你自己部署的中转服务,不会存到别处。<br>
         中转服务是必须的 —— 两家的流式接口都用自定义 HTTP Header 鉴权,而浏览器的 WebSocket 不允许设 Header,前端直连在协议层就走不通。
-      </p>
 
       <div class="grp" id="grpAli" hidden>
         <h4>阿里云百炼</h4>
@@ -284,7 +432,7 @@
             <button type="button" class="chip" data-fill="aliEp" data-v="wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference">新加坡通用域名</button>
           </div>
           <input id="aliEp" type="text" autocomplete="off" spellcheck="false" placeholder="wss://dashscope.aliyuncs.com/api-ws/v1/inference">
-          <p class="hint">用业务空间专属域名的话,把控制台「API Host」那一串直接粘进来即可,会自动补成
+          <p class="hint">用业务空间专属域名的,把控制台「API Host」那一串直接粘进来即可,会自动补全
             <code>wss://</code> 和 <code>/api-ws/v1/inference</code>。<br>
             例:<code>ws-xxxxxx.ap-southeast-1.maas.aliyuncs.com</code></p>
         </div>
@@ -296,7 +444,7 @@
             <button type="button" class="chip" data-fill="aliModel" data-v="qwen-audio-3.0-asr-flash-streaming">qwen-audio-3.0-asr-flash-streaming</button>
           </div>
           <input id="aliModel" type="text" autocomplete="off" spellcheck="false" placeholder="gummy-realtime-v1">
-          <p class="hint"><b>Gummy 只在北京地域提供</b>,它识别+翻译一步到位,0.00015 元/秒(约 0.54 元/小时)。<br>
+          <p class="hint"><b>Gummy 只在北京地域提供</b>,它识别+翻译一步到位(0.00015 元/秒,约 0.54 元/小时)。<br>
             新加坡等地域没有 Gummy,用 qwen-audio 系列做识别,翻译方式改成下面那一项。</p>
         </div>
 
@@ -348,7 +496,7 @@
             <option value="volc.bigasr.sauc.duration">volc.bigasr.sauc.duration(时长版)</option>
             <option value="volc.bigasr.sauc.concurrent">volc.bigasr.sauc.concurrent(并发版)</option>
           </select>
-          <p class="hint">按你在控制台开通的计费方式选,选错会直接报鉴权失败。</p>
+        <p class="hint">按你在控制台开通的计费方式选,选错会直接报鉴权失败。</p>
         </div>
         <div class="fld">
           <label>接入地址(WebSocket)</label>
@@ -397,7 +545,7 @@
           <option value="0">关</option>
         </select>
         <p class="hint">在浏览器本地按音色聚类,不依赖识别服务。检测到 2 个以上说话人才会显示标签。<br>
-          点任意一个标签可以改简称,比如改成「张总」「客户」。</p>
+        点任意一个标签可以改简称,比如改成「张总」「客户」。</p>
       </div>
 
       <div class="fld">
@@ -418,6 +566,12 @@
         <p class="hint">说话人停顿超过这个时长就把当前句定稿。调小出字更碎更快,调大更完整但延迟高。</p>
       </div>
 
+      <div class="fld">
+        <label>工具</label>
+        <button class="btn" id="btnZh2En" style="width:100%">中译英翻译</button>
+        <p class="hint">打开翻译对话框，输入中文翻译成英文。</p>
+      </div>
+
     </div>
   </div>
 
@@ -434,7 +588,7 @@
       <p class="note">
         靠<b>音色</b>(基频 + 过零率)在浏览器本地区分,不依赖识别服务 ——
         阿里云所有实时模型都不提供说话人标签。<br>
-        男女声、音高差得开的人分得比较准;<b>声音接近的人会被并成一个</b>,这是这种做法的上限。
+        男女声、音高差得开的人分得比较准,<b>声音接近的人会被并成一个</b>,这是这种做法的上限。
         分错了就点「重新识别」重来,或者在设置里把「预计人数」定死。
       </p>
       <div id="spkBody"></div>
@@ -475,7 +629,8 @@ class Resampler{
     while(Math.floor(p)+1<b.length){ const i=Math.floor(p),t=p-i; out.push(b[i]*(1-t)+b[i+1]*t); p+=this.step; }
     // p 是下一个待读位置,可能已经越过本次缓冲区末尾(48k→16k 时每块都会),
     // 必须钳制到 b.length,否则残余的小数位被丢掉,长时间会积累成时间轴漂移。
-    const used=Math.min(Math.floor(p),b.length); this.tail=b.slice(used); this.pos=p-used;
+    const used=Math.min(Math.floor(p),b.length);
+    this.tail=b.slice(used); this.pos=p-used;
     return Float32Array.from(out);
   }
 }
@@ -493,7 +648,7 @@ class Framer{
 }
 /* 重采样和分帧全部放进 AudioWorklet 里做。
  * 关键原因:窗口最小化 / 切到别的标签页时,浏览器会把主线程的定时器降频到每分钟一次,
- * 但 AudioWorklet 跑在音频渲染线程上,实时优先级,完全不受影响。
+ * 而 AudioWorklet 跑在音频渲染线程上,实时优先级,完全不受影响。
  * 主线程只负责把做好的帧丢进 WebSocket,不参与任何计时。 */
 const WORKLET=`
 class PcmTap extends AudioWorkletProcessor{
@@ -622,11 +777,23 @@ class Mic{
     this.sink=this.ctx.createGain(); this.sink.gain.value=0;
     src.connect(this.node); this.node.connect(this.sink); this.sink.connect(this.ctx.destination);
 
+    // 后台保活:Chrome 会把"没在出声"的 AudioContext 在页面不可见时挂起省电,
+    // 一挂起 AudioWorklet 就不再出帧 —— 这就是最小化/切窗口后收音中断的根因。
+    // 挂一个 45Hz、增益极低的音,让浏览器认定页面在出声,就不会被挂起。
+    this.keepGain=this.ctx.createGain(); this.keepGain.gain.value=0.01;
+    this.keep=this.ctx.createOscillator(); this.keep.frequency.value=45;
+    this.keep.connect(this.keepGain); this.keepGain.connect(this.ctx.destination);
+    try{ this.keep.start(); }catch(e){}
+
     // 系统休眠、切换音频设备等会让 AudioContext 掉进 suspended,自动拉回来
     this.ctx.onstatechange=()=>{
+      console.log('[mic] AudioContext:', this.ctx && this.ctx.state);
       if(this.ctx && this.ctx.state==='suspended' && this.on)
         this.ctx.resume().catch(()=>{});
     };
+
+    // 看门狗:后台里定时器会被降频,只算兜底,主力是上面那个保活音
+    this.watch=setInterval(()=>this.heal(), 2000);
 
     this.on=true; this.lastFrameAt=Date.now();
     console.log('[mic] %s · %dHz → %dHz · 每帧 %d 字节', this.mode, this.ctx.sampleRate, TARGET_RATE, FRAME_SAMPLE*2);
@@ -637,17 +804,42 @@ class Mic{
   resume(){ this.on=true; this.gate(true);
     try{ this.node && this.node.port && this.node.port.postMessage({cmd:'reset'}); }catch(e){}
     this.fr&&this.fr.reset(); this.lastFrameAt=Date.now(); this.kick(); }
-  // 从后台回到前台时叫醒:AudioContext 被挂起就恢复,轨道被静音也拉回来
+  // 回到前台/被叫醒:上下文挂起就恢复;状态正常但帧流断了就重启音频管线
   kick(){
-    try{ if(this.ctx && this.ctx.state!=='running') this.ctx.resume().catch(()=>{}); }catch(e){}
+    try{
+      if(!this.ctx) return;
+      if(this.ctx.state!=='running'){ this.ctx.resume().catch(()=>{}); return; }
+      if(this.stalledFor()>3000) this.restartPipeline();
+    }catch(e){}
   }
-  // 距上一帧音频过去多久了 —— 用来判断链路是不是悄悄断了
+  heal(){
+    if(!this.ctx || !this.on) return;
+    try{
+      if(this.ctx.state!=='running'){ this.ctx.resume().catch(()=>{}); return; }
+      const ts=this.stream&&this.stream.getAudioTracks ? this.stream.getAudioTracks() : [];
+      for(const t of ts) if(!t.enabled) t.enabled=true;
+      if(this.stalledFor()>5000 && Date.now()-(this.lastRestart||0)>10000){
+        this.lastRestart=Date.now();
+        this.restartPipeline();
+      }
+    }catch(e){}
+  }
+  // 挂起再恢复:强制重建音频回调链,能救"状态显示 running 但不出帧"的假死
+  restartPipeline(){
+    try{
+      console.log('[mic] 音频管线假死,重启中…');
+      this.ctx.suspend().then(()=>this.ctx.resume()).catch(()=>{});
+    }catch(e){}
+  }
   stalledFor(){ return this.on && this.lastFrameAt ? Date.now()-this.lastFrameAt : 0; }
   stop(){ this.on=false;
+    clearInterval(this.watch); this.watch=null;
+    try{this.keep&&this.keep.stop()}catch(e){}
+    try{this.keepGain&&this.keepGain.disconnect()}catch(e){}
     try{this.node&&this.node.disconnect()}catch(e){}
     try{this.stream&&this.stream.getTracks().forEach(t=>t.stop())}catch(e){}
     try{this.ctx&&this.ctx.close()}catch(e){}
-    this.ctx=this.node=this.stream=this.analyser=null; }
+    this.ctx=this.node=this.stream=this.analyser=null; this.keep=this.keepGain=null; }
   level(){
     if(!this.analyser||!this.on) return 0;
     const a=new Uint8Array(this.analyser.frequencyBinCount); this.analyser.getByteFrequencyData(a);
@@ -695,7 +887,6 @@ const NO_RELAY_MSG='你是直接打开的网页文件,没有中转服务。<br>'
 class Source{ constructor(){ this.onPartial=this.onFinal=this.onState=()=>{}; }
   start(){} sendAudio(){} stop(){} get needMic(){ return true; }
   // 真实链路靠停送音频来"暂停",数据源本身不用管;演示模式没有麦克风,
-  // 必须自己停,否则点了暂停字幕还在往外冒。
   pause(){} resume(){} }
 
 const DEMO=[
@@ -720,11 +911,10 @@ class DemoSource extends Source{
       if(this.stopped) return;
       k++;
       const r=k/w.length;
-      // 中文不跟着每个词跳,等英文积累到一定比例才推进,避免下半屏闪烁
       const dst = r<0.45 ? '' : zh.slice(0, Math.floor(zh.length*Math.min(1,(r-0.2)/0.75)));
-      this.onPartial({src:w.slice(0,k).join(' '), dst});
+      this.onPartial({src:w.slice(0,k).join(' '), dst, lang:'en'});
       this.t = k<w.length ? setTimeout(tick,130+Math.random()*130)
-        : setTimeout(()=>{ if(this.stopped) return; this.onFinal({src:en,dst:zh});
+        : setTimeout(()=>{ if(this.stopped) return; this.onFinal({src:en,dst:zh,lang:'en'});
             this.t=setTimeout(()=>{ if(this.stopped) return; this.next(); },500+Math.random()*700); },420);
     };
     this.t=setTimeout(tick,300);
@@ -740,8 +930,7 @@ class DemoSource extends Source{
  * Hobby 版 300 秒就会被平台掐断。断了立刻重连,已有字幕不丢,
  * 只损失重连那一瞬间(几百毫秒)的音频,基本无感。
  * 但只有"曾经连通过"的会话才自动重连 —— 第一次就连不上(服务没起、密钥错)
- * 要立刻把真实原因报出来,不能闷头重试把错误信息盖掉。
- */
+ * 要立刻把真实原因报出来,不能闷头重试把错误信息盖掉。 */
 const MAX_RETRY = 6;
 class RelaySource extends Source{
   constructor(provider){ super(); this.provider=provider; this.q=[]; this.tries=0; this.everReady=false; }
@@ -770,8 +959,23 @@ class RelaySource extends Source{
 
     ws.onmessage=e=>{
       let m; try{ m=JSON.parse(e.data); }catch(err){ return; }
-      if(m.type==='partial')      this.onPartial({src:m.src||'',dst:m.dst||''});
-      else if(m.type==='final')   this.onFinal({src:m.src||'',dst:m.dst||''});
+      if(m.type==='partial')      this.onPartial({src:m.src||'',dst:m.dst||'',lang:m.lang||'en'});
+      else if(m.type==='final')   this.onFinal({src:m.src||'',dst:m.dst||'',lang:m.lang||'en'});
+      else if(m.type==='final-src'){ this.onSrcFinal && this.onSrcFinal({src:m.src||'',lang:m.lang||'en'}); }
+      else if(m.type==='final-dst'){ this.onDstFinal && this.onDstFinal({dst:m.dst||'',lang:m.lang||'en'}); }
+      else if(m.type==='word-result'){
+        if(m.translation){ wordTip.textContent=m.word+' → '+m.translation; }
+        else { wordTip.textContent='未找到释义'; }
+      }
+      else if(m.type==='zh2en-result'){
+        $('zh2enOutput').textContent = m.translation || '翻译失败';
+        if(m.translation){
+          const input=($('zh2enInput')||{}).value||'';
+          zh2enHist.unshift({src:input, dst:m.translation, time:Date.now()});
+          if(zh2enHist.length>200) zh2enHist.length=200;
+          saveHistZh2en();
+        }
+      }
       else if(m.type==='ready'){  this.everReady=true; this.tries=0; this.onState('running'); }
       else if(m.type==='error'){  this.hadError=true; this.onState('error', m.message||'服务返回错误'); }
     };
@@ -832,52 +1036,332 @@ const srcBody=$('srcBody'), dstBody=$('dstBody'), toast=$('toast'), meta=$('meta
       btnClear=$('btnClear'), clearLabel=$('clearLabel');
 
 const S={ running:false, paused:false, reconnecting:false, bilingual:true,
-          history:[], partial:{src:'',dst:''}, t0:0, timer:null };
+          history:[], partial:{src:'',dst:'',lang:'en'}, t0:0, timer:null,
+          lastLang:'en' };
 let mic=null, source=null, pipWin=null, tmpT=null;
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+/* ---------- 单词悬停翻译 ---------- */
+const wordTip=$('wordTip');
+let wordTipTimer=null, wordTipWord='';
+const LANG_NAME={en:'EN',zh:'ZH'};
+function updateLangDir(){
+  const lang=S.lastLang;
+  $('srcLangDir').textContent = lang ? '· '+LANG_NAME[lang] : '';
+  $('dstLangDir').textContent = lang ? '· '+LANG_NAME[lang==='en'?'zh':'en'] : '';
+  $('langBtn').innerHTML = (lang==='zh'?'中':'英')
+    +' <span style="opacity:.6">&#8594;</span> '+(lang==='zh'?'英':'中');
+}
+function hideWordTip(){ wordTip.classList.remove('is-show'); wordTipWord=''; }
+function showWordTip(el, word){
+  if(!source || !S.running) return;
+  clearTimeout(wordTipTimer);
+  wordTipTimer=setTimeout(()=>{
+    if(wordTipWord===word) return;
+    wordTipWord=word;
+    wordTip.textContent='查询中…';
+    const rect=el.getBoundingClientRect();
+    wordTip.style.left=Math.max(8, Math.min(rect.left+rect.width/2-60, window.innerWidth-140))+'px';
+    wordTip.style.top=(rect.top-40)+'px';
+    wordTip.classList.add('is-show');
+    if(source && source.ws && source.ws.readyState===1){
+      source.ws.send(JSON.stringify({type:'word-translate', word}));
+    }
+  },250);
+}
+document.addEventListener('mouseover',e=>{
+  const w=e.target.closest('.w');
+  if(w) showWordTip(w, w.dataset.w);
+});
+document.addEventListener('mouseout',e=>{
+  if(e.target.closest('.w')){ clearTimeout(wordTipTimer); hideWordTip(); }
+});
+
+/* ---------- 单词收藏 ---------- */
+const FAV_KEY='si.fav.v1';
+let favList=[];
+function loadFav(){
+  try{ favList=JSON.parse(localStorage.getItem(FAV_KEY)||'[]'); }catch(e){ favList=[]; }
+}
+function saveFav(){
+  try{ localStorage.setItem(FAV_KEY,JSON.stringify(favList)); }catch(e){}
+}
+function isFav(word){
+  return favList.some(x=>x.word.toLowerCase()===word.toLowerCase());
+}
+function toggleFav(word, trans){
+  const w=word.toLowerCase();
+  const idx=favList.findIndex(x=>x.word.toLowerCase()===w);
+  if(idx>=0){ favList.splice(idx,1); }
+  else{ favList.unshift({word, trans:trans||'', time:Date.now()}); }
+  saveFav(); renderFav();
+}
+
+const zh2enHist=[];
+function histBase(){
+  const r=(cfg.relay||'').trim();
+  if(r){ try{ const u=new URL(r); return u.origin; }catch{} }
+  if(FILE_MODE) return '';
+  return location.origin;
+}
+function loadZh2enHist(){
+  const base=histBase(); if(!base) return;
+  fetch(base+'/api/hist?scope=zh2en').then(r=>r.json()).then(j=>{
+    if(j.zh2en && j.zh2en.length){ zh2enHist.length=0; zh2enHist.push(...j.zh2en); }
+  }).catch(()=>{});
+}
+let savedUpTo=0, pendingSave=[], appendT=null;
+function flushHist(){
+  if(!pendingSave.length) return;
+  const base=histBase();
+  if(!base){ pendingSave.length=0; return; }
+  const batch=pendingSave.splice(0);
+  if(Array.isArray(storedHist)) storedHist.push(...batch);
+  try{ fetch(base+'/api/hist/live/append',{method:'POST',body:JSON.stringify(batch)}); }catch(e){}
+}
+function collectHist(){
+  while(savedUpTo<S.history.length && !S.history[savedUpTo].pending){
+    pendingSave.push(S.history[savedUpTo]);
+    savedUpTo++;
+  }
+  if(pendingSave.length){
+    clearTimeout(appendT);
+    appendT=setTimeout(flushHist, 800);
+  }
+}
+let storedHist=null;
+function loadStoredHist(cb){
+  if(storedHist){ cb&&cb(); return; }
+  const base=histBase();
+  if(!base){ storedHist=[]; cb&&cb(); return; }
+  fetch(base+'/api/hist?scope=live').then(r=>r.json()).then(j=>{
+    storedHist=Array.isArray(j.live)?j.live:[];
+    storedHist.forEach(r=>{ if(r.pending) r.pending=false; });
+    cb&&cb();
+  }).catch(()=>{ storedHist=[]; cb&&cb(); });
+}
+function saveHistZh2en(){
+  const base=histBase(); if(!base) return;
+  try{ fetch(base+'/api/hist/zh2en',{method:'POST',body:JSON.stringify(zh2enHist)}); }catch(e){}
+}
+setTimeout(loadZh2enHist, 800);
+function renderFav(){
+  const list=$('favList'), empty=$('favEmpty'), count=$('favCount');
+  count.textContent=favList.length;
+  if(favList.length===0){
+    empty.style.display='block'; list.innerHTML=''; return;
+  }
+  empty.style.display='none';
+  list.innerHTML=favList.map(x=>`
+    <div class="fav__item" data-word="${esc(x.word)}">
+      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div class="fav__word">${esc(x.word)}</div>
+        <button class="fav__speak" data-word="${esc(x.word)}" aria-label="发音" title="发音">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 4a4.5 4.5 0 0 1 0 9"/><path d="M19 4a9 9 0 0 1 0 12"/></svg>
+        </button>
+      </div>
+      <div class="fav__trans">${esc(x.trans)}</div>
+      <div class="fav__meta">
+        <span>${new Date(x.time).toLocaleString()}</span>
+        <button class="fav__del" data-word="${esc(x.word)}" aria-label="删除">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('.fav__del').forEach(b=>{
+    b.onclick=e=>{ e.stopPropagation(); toggleFav(b.dataset.word); };
+  });
+  list.querySelectorAll('.fav__speak').forEach(b=>{
+    b.onclick=e=>{ e.stopPropagation(); speakWord(b.dataset.word); };
+  });
+}
+function speakWord(word){
+  if(!('speechSynthesis' in window)) return flash('当前浏览器不支持语音合成');
+  speechSynthesis.cancel();
+  if(speechSynthesis.paused) speechSynthesis.resume();
+  const u=new SpeechSynthesisUtterance(word);
+  u.lang='en-US'; u.rate=1; u.volume=1;
+  u.onerror=e=>{ console.error('TTS error',e); flash('发音失败：'+e.error); };
+  const trySpeak=()=>{ speechSynthesis.speak(u); };
+  if(speechSynthesis.getVoices().length===0){
+    speechSynthesis.onvoiceschanged=trySpeak;
+  }else{
+    trySpeak();
+  }
+}
+
+/* 收藏面板打开/关闭 */
+const favPanel=$('favPanel');
+$('favToggle').onclick=()=>{ favPanel.classList.add('is-open'); };
+$('favClose').onclick=()=>{ favPanel.classList.remove('is-open'); };
+document.addEventListener('click',e=>{
+  if(!favPanel.contains(e.target) && !e.target.closest('.fav__toggle')) favPanel.classList.remove('is-open');
+});
+
+const histPanel=$('histPanel');
+let histTab='live';
+function histData(){
+  return histTab==='live' ? (storedHist||[]) : zh2enHist;
+}
+function deleteHistRow(i){
+  const data=histData();
+  const row=data[i];
+  if(!row) return;
+  if(!window.confirm('删除这条记录?')) return;
+  data.splice(i,1);
+  if(histTab==='live'){
+    pendingSave=pendingSave.filter(x=>!(x.src===row.src && x.dst===row.dst && x.t===row.t));
+  }
+  renderHist();
+  const base=histBase();
+  if(base){
+    try{ fetch(base+'/api/hist/delete',{method:'POST',body:JSON.stringify({scope:histTab,row})}); }catch(e){}
+  }
+  flash('已删除一条记录');
+}
+function renderHist(){
+  const list=$('histList'), empty=$('histEmpty'), count=$('histCount');
+  const data=histData();
+  count.textContent=data.length;
+  if(histTab==='live' && !storedHist){
+    empty.textContent='加载中…';
+    empty.style.display='block'; list.innerHTML=''; return;
+  }
+  if(data.length===0){
+    empty.textContent=histTab==='live'?'暂无实时翻译记录':'暂无中译英记录';
+    empty.style.display='block'; list.innerHTML=''; return;
+  }
+  empty.style.display='none';
+  list.innerHTML=data.map((r,i)=>{
+    const spkTag=(histTab==='live'&&spkVisible()&&r.spk)
+      ? '<span class="hist__spk" style="--c:'+spkColor(r.spk)+'">'+spkName(r.spk)+'</span>'
+      : '';
+    return '<div class="hist__item" data-i="'+i+'" title="右键删除">'
+      +'<button class="hist__del" data-i="'+i+'" title="删除">&times;</button>'+spkTag
+      +'<div class="hist__src">'+esc(r.src)+'</div>'
+      +'<div class="hist__dst">'+esc(r.dst)+'</div>'
+      +'<div class="hist__meta"><span>'+(r.lang||'en')+'</span></div>'
+      +'</div>';
+  }).join('');
+  list.querySelectorAll('.hist__item').forEach(el=>{
+    const i=Number(el.dataset.i);
+    el.oncontextmenu=e=>{ e.preventDefault(); deleteHistRow(i); };
+    const b=el.querySelector('.hist__del');
+    if(b) b.onclick=e=>{ e.stopPropagation(); deleteHistRow(i); };
+  });
+}
+$('histTabLive').onclick=()=>{
+  histTab='live';
+  $('histTabLive').classList.add('is-active');
+  $('histTabZh2en').classList.remove('is-active');
+  renderHist();
+  loadStoredHist(()=>{ if(histTab==='live') renderHist(); });
+};
+$('histTabZh2en').onclick=()=>{
+  histTab='zh2en';
+  $('histTabZh2en').classList.add('is-active');
+  $('histTabLive').classList.remove('is-active');
+  renderHist();
+};
+$('histToggle').onclick=()=>{
+  renderHist();
+  histPanel.classList.add('is-open');
+  loadStoredHist(()=>{ if(histTab==='live' && histPanel.classList.contains('is-open')) renderHist(); });
+};
+$('histClose').onclick=()=>{ histPanel.classList.remove('is-open'); };
+document.addEventListener('click',e=>{
+  if(!histPanel.contains(e.target) && !e.target.closest('.hist__toggle')) histPanel.classList.remove('is-open');
+});
+
+/* 单词点击收藏（在 wrapWords 生成的 .w 上绑定） */
+document.addEventListener('click',e=>{
+  const w=e.target.closest('.w');
+  if(!w) return;
+  const word=w.dataset.w;
+  if(!word) return;
+  console.log('[fav] word clicked:', word);
+  const idx=favList.findIndex(x=>x.word.toLowerCase()===word.toLowerCase());
+  if(idx>=0){
+    toggleFav(word);
+    flash('已取消收藏: '+word);
+    return;
+  }
+  /* 先尝试从 tooltip 获取翻译 */
+  let trans='';
+  if(wordTip.textContent.includes('→')){
+    trans=wordTip.textContent.split('→')[1].trim();
+  }
+  console.log('[fav] trans from tip:', trans);
+  /* 如果没有翻译，尝试请求 */
+  if(!trans && source && source.ws && source.ws.readyState===1){
+    wordTip.textContent='查询中…';
+    source.ws.send(JSON.stringify({type:'word-translate', word}));
+    console.log('[fav] sent word-translate request');
+    /* 等待翻译返回，最多 2 秒 */
+    let attempts=0;
+    const timer=setInterval(()=>{
+      attempts++;
+  if(wordTip.textContent.includes('→')){
+    trans=wordTip.textContent.split('→')[1].trim();
+        clearInterval(timer);
+        console.log('[fav] got trans:', trans);
+        if(trans) toggleFav(word, trans);
+        else toggleFav(word);
+        flash('已收藏: '+word);
+      }else if(attempts>20){
+        clearInterval(timer);
+        console.log('[fav] timeout, saving without trans');
+        toggleFav(word);
+        flash('已收藏: '+word);
+      }
+    },100);
+  }else{
+    toggleFav(word, trans);
+    flash('已收藏: '+word);
+  }
+});
+
+loadFav(); renderFav();
 
 const PROVIDER_NAME={demo:'演示数据',aliyun:'阿里云百炼',volc:'火山引擎'};
 const HINT = () =>
   FILE_MODE && cfg.provider!=='demo'
    ? '⚠ 你是直接打开的网页文件,连不到中转服务。<br>请先双击 <b>start.bat</b>,再打开 http://localhost:8787'
    : cfg.provider==='demo'
-   ? '当前为演示模式,点「开始」即可预览效果。<br>要用真实识别,点右上角齿轮填入密钥。'
+     ? '当前为演示模式,点「开始」即可预览效果。<br>要用真实识别,点右上角齿轮填入密钥。'
    : '点击下方「开始」进行收音';
 
-/* ---------- 说话人分离(浏览器本地,按音色聚类)----------
+/* ---------- 滚动:只有停在底部时才跟着新内容走 ----------
  * 为什么不用上游的:阿里云所有实时模型都不提供说话人分离(只有录音文件模型有);
  * 火山的双向流式虽然支持,但参数名我没法在这儿核实,猜错了就是白等。
- * 所以从声音本身算:基频(男女、音高差异)+ 过零率(音色明暗),在线聚类。
+ * 所以从声音本身算:基频(男女、音高差)+ 过零率(音色明暗),在线聚类。
  * 上游要是给了说话人标签,优先用它 —— 见 wire() 里的 f.spk。
  *
- * 能力边界说在前面:音高差得开的人分得准,声音接近的会被并成一个。
+ * 能力边界说在前面:音高差得开的人分得清,声音接近的会被并成一个。
  * 这是纯靠这两个特征的上限,想更准得上声纹模型,那是另一个量级的东西。 */
 const SPK_COLORS=['#2AC3F2','#F2A93B','#7ED957','#F26D9B','#B08CF2','#5BD6C4'];
+const SPK_AVATARS=['👤','👩','👨','🧑','👵','👴'];
 const SPK={ list:[], feats:[] };
 
-const spkName  = id => (cfg.spkNames&&cfg.spkNames[id]) || String.fromCharCode(64+id);   // A B C…
+const spkName  = id => (cfg.spkNames&&cfg.spkNames[id]) || String.fromCharCode(64+id);
+const spkAvatar = id => SPK_AVATARS[(id-1)%SPK_AVATARS.length];
 const spkColor = id => SPK_COLORS[(id-1)%SPK_COLORS.length];
 const spkLimit = () => Number(cfg.spkMax)>0 ? Number(cfg.spkMax) : SPK_COLORS.length;
-// 只有真的听出两个人才显示标签,一个人说话时不该平白多一列
 const spkVisible = () => !!Number(cfg.spk) && SPK.list.length>=2;
 
 function spkFeed(f){ if(SPK.feats.length<800) SPK.feats.push(f); }
 
 const med=a=>{ const b=a.slice().sort((x,y)=>x-y); return b[b.length>>1]; };
-// 基频取对数:人耳和说话人差异都是按比例来的,不是按赫兹差
+// 只有真的听出两个人才显示标签,一个人说话时不该平白多一列
 const spkVec = fs => [ Math.log(med(fs.map(x=>x.f0))), med(fs.map(x=>x.zcr))*6 ];
-// 基频是主要依据,过零率只做辅助,权重压到一半
 const spkDist=(a,b)=>Math.hypot(a[0]-b[0],(a[1]-b[1])*0.5);
 const SPK_TH=0.20;                       // 约 4 个半音,再大就把不同人并了
-
 function spkAssign(){
   const fs=SPK.feats.splice(0);
   if(fs.length<5) return null;           // 采样太少判不准,宁可不标也别标错
   const v=spkVec(fs);
   let best=null,bd=1e9;
   for(const sp of SPK.list){ const d=spkDist(v,sp.v); if(d<bd){ bd=d; best=sp; } }
-  // 用户明确说了有几个人、而目前还没凑够的时候,把阈值收紧,更愿意分出新的人。
-  // 否则「预计人数」就只是个上限,对两个声音接近的人毫无帮助 —— 那就是在骗人。
   const th = (Number(cfg.spkMax)>0 && SPK.list.length<spkLimit()) ? SPK_TH*0.6 : SPK_TH;
   if(best && bd<th){
     best.v=[best.v[0]*0.8+v[0]*0.2, best.v[1]*0.8+v[1]*0.2];   // 滑动平均,慢慢收敛
@@ -892,7 +1376,6 @@ function spkAssign(){
 function spkReset(){ SPK.list.length=0; SPK.feats.length=0; renderSpk(); render(); }
 
 /* ---------- 滚动:只有停在底部时才跟着新内容走 ----------
- * 以前每次渲染都无条件拽到底,往回翻历史根本看不成。
  * 现在记住每个面板是不是"贴着底",只有贴底才自动跟;
  * 一旦往上翻就交出控制权,右下角冒出「回到最新」。 */
 const STICK_PX = 48;                       // 离底部这么近就算贴着底
@@ -911,19 +1394,40 @@ function bindScroll(el, btn){
 }
 const syncSrc=bindScroll(srcBody,$('jumpSrc')), syncDst=bindScroll(dstBody,$('jumpDst'));
 
-/* 一行 = 左边说话人标签 + 右边文字。没开或只有一个人时不占那一列。 */
+/* 一行 = 左边说话人标签 + 右边文字。没开或只有一个人时不占那一列。
+   src 文本的每个单词用 <span class="w"> 包裹,支持悬停翻译。 */
+function wrapWords(text){
+  return esc(text).replace(/([a-zA-Z']+|[^\s])/g, m => {
+    if(/^[a-zA-Z']+$/.test(m)) return '<span class="w" data-w="'+esc(m)+'">'+m+'</span>';
+    return m;
+  });
+}
 function lineHTML(r,k,interim){
   const tag = (spkVisible() && r.spk)
     ? '<button class="spk" data-s="'+r.spk+'" style="--c:'+spkColor(r.spk)+'" '
-      +'title="点一下改简称">'+esc(spkName(r.spk))+'</button>'
+      +'title="点一下改简称">'+spkAvatar(r.spk)+' '+esc(spkName(r.spk))+'</button>'
     : '';
+  let text;
+  if(k==='src') text=wrapWords(r[k]||'');
+  else if(r.pending && !r[k]) text='<span style="opacity:.4">翻译中…</span>';
+  else text=esc(r[k]||'');
   return '<p class="line'+(interim?' line--interim':'')+'">'+tag
-       + '<span class="line__t">'+esc(r[k]||'')+'</span></p>';
+       + '<span class="line__t">'+text+'</span></p>';
 }
 
+let renderQueued=false;
 function render(){
+  if(renderQueued) return;
+  renderQueued=true;
+  requestAnimationFrame(()=>{ renderQueued=false; renderNow(); });
+}
+// 主界面只画最近的若干行:历史已经几千条,全量重绘会把流式文字卡成一跳一跳的。
+// 完整记录在「历史」面板里看,不受这个上限影响。
+const LIVE_ROWS=150;
+function renderNow(){
   const rows=k=>{
-    let h=S.history.map(r=>lineHTML(r,k,false)).join('');
+    const tail=S.history.length>LIVE_ROWS ? S.history.slice(-LIVE_ROWS) : S.history;
+    let h=tail.map(r=>lineHTML(r,k,false)).join('');
     if(S.partial[k]) h+=lineHTML(S.partial,k,true);
     return h;
   };
@@ -936,8 +1440,8 @@ function render(){
     if(stick[el.id]) el.scrollTop = el.scrollHeight;
     else el.scrollTop = top;
   }
+  if(histPanel.classList.contains('is-open')) renderHist();
   syncSrc(); syncDst();
-  // 字幕是持续累积的,禁用态必须跟着每次渲染重算,不能只在开始/暂停时算一次
   btnClear.disabled=!S.history.length&&!S.partial.src&&!S.partial.dst;
   btnDone.disabled=!S.running&&S.history.length===0;
   paintPip();
@@ -951,7 +1455,7 @@ function flash(m){ showToast(m); tmpT=setTimeout(()=>{
   else if(S.paused) showToast('收音已暂停,点击重试');
   else hideToast(); },2200); }
 
-// 演示模式高亮成琥珀色 —— 灰扑扑的一行"演示数据"太容易被忽略,
+// 演示模式高亮成琥珀色 —— 灰扑扑的"演示数据"太容易被忽略,
 // 用户会以为出的字幕是自己说的话。
 const tag=()=> cfg.provider==='demo'
   ? '<b style="color:#D9A441;font-weight:600">演示数据(未配置密钥)</b>'
@@ -959,8 +1463,6 @@ const tag=()=> cfg.provider==='demo'
 function setMeta(){
   if(!S.running){ meta.innerHTML = S.history.length?'已停止':('未开始 · '+tag()); return; }
   const t=Math.floor((Date.now()-S.t0)/1000);
-  // 音频断流检测:手机切后台、系统抢走麦克风时会发生。
-  // 桌面端切窗口不会触发 —— 那种情况音频照常在跑。
   const stall = mic && !S.paused && mic.stalledFor()>4000;
   meta.innerHTML=(S.paused?'已暂停 ':'已进行 ')
     +String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0')
@@ -985,21 +1487,47 @@ const cv=$('meter'), c2=cv.getContext('2d'); const BARS=5; let bars=new Array(BA
 })();
 
 function wire(s){
-  s.onPartial=p=>{ S.partial={src:p.src||'',dst:p.dst||''}; render(); };
+  s.onPartial=p=>{
+    S.partial={src:p.src||'',dst:p.dst||'',lang:p.lang||'en'};
+    if(p.lang) S.lastLang=p.lang;
+    updateLangDir();
+    render();
+  };
   s.onFinal=f=>{
     if(f.src||f.dst){
-      // 上游给了说话人标签就直接用(火山双向流式支持);没给就用本地音色聚类
       const spk = f.spk!=null ? Number(f.spk)+1 : (Number(cfg.spk)?spkAssign():null);
-      S.history.push({src:f.src||'',dst:f.dst||'',spk});
+      S.history.push({src:f.src||'',dst:f.dst||'',spk,lang:f.lang||'en'});
+      collectHist();
+      if(f.lang) S.lastLang=f.lang;
       if(spkSheet.classList.contains('is-show')) renderSpk();
     } else SPK.feats.length=0;
-    S.partial={src:'',dst:''}; render();
+    S.partial={src:'',dst:'',lang:'en'}; updateLangDir(); render();
+  };
+  const dstBuf=[];
+  s.onSrcFinal=f=>{
+    const spk = f.spk!=null ? Number(f.spk)+1 : (Number(cfg.spk)?spkAssign():null);
+    const row={src:f.src||'',dst:'',spk,lang:f.lang||'en',pending:true,t:Date.now()};
+    if(dstBuf.length){ row.dst=dstBuf.shift(); row.pending=false; }
+    S.history.push(row);
+    collectHist();
+    if(f.lang) S.lastLang=f.lang;
+    if(spkSheet.classList.contains('is-show')) renderSpk();
+    S.partial={src:'',dst:'',lang:'en'}; updateLangDir(); render();
+  };
+  s.onDstFinal=f=>{
+    const i=S.history.findIndex(r=>r.pending);
+    if(i>=0){
+      S.history[i].dst=f.dst||'';
+      S.history[i].pending=false;
+    } else if(f.dst){
+      dstBuf.push(f.dst);
+      if(dstBuf.length>3) dstBuf.shift();
+    }
+    collectHist(); render();
   };
   s.onState=(st,msg)=>{
     if(st==='running'){ S.reconnecting=false; hideToast(); setMeta(); }
-    // 重连不算出错:麦克风继续开着,已有字幕保留,只在顶部标一下状态。
-    // 上游会话是重开的,没定稿的半句会被重新识别一遍,所以先清掉免得重复。
-    if(st==='reconnecting'){ S.reconnecting=true; S.partial={src:'',dst:''}; render(); setMeta(); }
+    if(st==='reconnecting'){ S.reconnecting=true; S.partial={src:'',dst:'',lang:'en'}; render(); setMeta(); }
     if(st==='error'){
       S.reconnecting=false; S.paused=true; mic&&mic.pause();
       showToast(msg||'连接中断,点击重试'); syncRun(); setMeta();
@@ -1031,8 +1559,8 @@ async function start(){
   }
   source=src; source.start();
   S.running=true; S.paused=false; S.t0=Date.now();
-  hideToast(); syncRun(); render(); keepAwake();
-  clearInterval(S.timer); S.timer=setInterval(setMeta,250); setMeta();
+  hideToast(); syncRun(); updateLangDir(); render(); keepAwake();
+  clearInterval(S.timer); S.timer=setInterval(()=>{ autoHeal(); sweepPending(); setMeta(); },250); setMeta();
 }
 function pause(){ S.paused=true; mic&&mic.pause(); source&&source.pause(); releaseAwake();
   showToast('收音已暂停,点击重试'); syncRun(); setMeta(); }
@@ -1042,6 +1570,29 @@ function stopAll(){
   S.running=false; S.paused=false; S.reconnecting=false; clearInterval(S.timer);
   try{source&&source.stop()}catch(e){} try{mic&&mic.stop()}catch(e){}
   source=null; mic=null; releaseAwake(); hideToast(); syncRun(); setMeta();
+  S.lastLang='en'; updateLangDir(); hideWordTip();
+}
+// 帧流断了 6 秒自动救一次 —— 不再只弹提示让用户手动点暂停/继续
+let lastHeal=0;
+function autoHeal(){
+  if(!S.running || S.paused || !mic) return;
+  if(mic.stalledFor()<6000 || Date.now()-lastHeal<10000) return;
+  lastHeal=Date.now();
+  console.log('[mic] 收音中断,自动恢复');
+  try{ mic.pause(); mic.resume(); }catch(e){}
+  flash('收音中断,已自动恢复');
+}
+// 等太久的「翻译中…」占位就别一直挂着了
+let pendSweep=0;
+function sweepPending(){
+  const now=Date.now();
+  if(now-pendSweep<3000) return;
+  pendSweep=now;
+  let changed=false;
+  for(const r of S.history){
+    if(r.pending && r.t && now-r.t>20000){ r.pending=false; changed=true; }
+  }
+  if(changed) render();
 }
 function syncRun(){
   const live=S.running&&!S.paused;
@@ -1057,10 +1608,10 @@ btnRun.onclick=()=>!S.running?start():(S.paused?resume():pause());
 toast.onclick=()=>S.running?resume():start();
 btnBi.onclick=()=>{ S.bilingual=!S.bilingual; document.body.classList.toggle('mono',!S.bilingual);
                     btnBi.classList.toggle('is-on',S.bilingual); render(); };
-$('langBtn').onclick=()=>flash('当前仅支持 英 &#8594; 中');
+$('langBtn').onclick=()=>flash('双向同传已开启 · 自动检测语言');
 
-/* 清空当前字幕。一整场同传的记录点没了很难受,所以要点两下确认。
-   清空不会停止收音,接着说就接着出字。 */
+/* 清空当前字幕。一整场同传的记录点没了很可惜,所以要点两下确认。
+   清空不会停止收音,接着说就接着出字。*/
 let clearArm=null;
 const disarmClear=()=>{ clearTimeout(clearArm); clearArm=null;
   btnClear.classList.remove('is-on'); clearLabel.textContent='清空'; };
@@ -1073,7 +1624,7 @@ btnClear.onclick=()=>{
   }
   disarmClear();
   S.history.length=0; S.partial={src:'',dst:''}; SPK.feats.length=0;
-  render(); syncRun(); setMeta(); paintPip();
+  collectHist(); render(); syncRun(); setMeta(); paintPip();
   flash('已清空');
 };
 
@@ -1098,7 +1649,7 @@ function paintPip(){
   if(!pipWin||pipWin.closed) return;
   const box=pipWin.document.getElementById('p'); if(!box) return;
   box.innerHTML=S.history.slice(-3).map(r=>'<p>'
-      +(spkVisible()&&r.spk?'<b style="color:'+spkColor(r.spk)+'">'+esc(spkName(r.spk))+'</b> ':'')
+      +(spkVisible()&&r.spk?'<b style="color:'+spkColor(r.spk)+'">'+spkAvatar(r.spk)+' '+esc(spkName(r.spk))+'</b> ':'')
       +esc(r.dst)+'</p>').join('')
     +(S.partial.dst?'<p class="i">'+esc(S.partial.dst)+'</p>':'');
 }
@@ -1133,7 +1684,6 @@ function normHttp(v, defPath){
   }catch(e){ return v; }
 }
 
-/* 读表单(不落盘),顺手把地址规范化并回填,让用户看见真正会用的地址 */
 function collect(){
   const o={};
   for(const k in F) o[k]= k==='endSil' ? (Number(F[k].value)||800) : F[k].value.trim();
@@ -1228,6 +1778,7 @@ function renderSpk(){
     ? SPK.list.map(sp=>
         '<div class="spkrow">'
         +'<span class="dot" style="background:'+spkColor(sp.id)+'"></span>'
+        +'<span style="font-size:22px;width:32px;text-align:center">'+spkAvatar(sp.id)+'</span>'
         +'<input data-id="'+sp.id+'" maxlength="8" placeholder="'+String.fromCharCode(64+sp.id)+'" '
         +'value="'+esc((cfg.spkNames&&cfg.spkNames[sp.id])||'')+'">'
         +'<span class="meta2">'+Math.round(sp.f0)+' Hz · '+sp.n+' 句</span>'
@@ -1245,6 +1796,65 @@ function renderSpk(){
 function openSpk(){ renderSpk(); spkSheet.classList.add('is-show'); }
 $('spkClose').onclick=()=>spkSheet.classList.remove('is-show');
 $('spkResetBtn').onclick=()=>{ spkReset(); flash('已重新开始识别说话人'); };
+
+const zh2enSheet=$('zh2enSheet');
+const zh2enFab=$('zh2enFab');
+zh2enFab.onclick=()=>{
+  const isHidden=zh2enSheet.style.display==='none';
+  if(isHidden){
+    zh2enSheet.style.display='block';
+    $('zh2enInput').value='';
+    $('zh2enOutput').textContent='翻译结果会显示在这里…';
+    setTimeout(()=>$('zh2enInput').focus(),50);
+  } else {
+    zh2enSheet.style.display='none';
+  }
+};
+$('zh2enClose').onclick=()=>{ zh2enSheet.style.display='none'; };
+$('zh2enGo').onclick=()=>{
+  const text=$('zh2enInput').value.trim();
+  if(!text){ $('zh2enOutput').textContent='请先输入中文'; return; }
+  if(!source || !source.ws || source.ws.readyState!==1){ $('zh2enOutput').textContent='中转未连接，无法翻译'; return; }
+  $('zh2enOutput').textContent='翻译中…';
+  source.ws.send(JSON.stringify({type:'zh2en-translate', text}));
+};
+$('zh2enInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) $('zh2enGo').click(); });
+
+(function(){
+  const drag=$('zh2enDrag'), box=$('zh2enSheet');
+  let dragging=false, sx=0, sy=0, ox=0, oy=0;
+  drag.addEventListener('mousedown',e=>{
+    if(e.target.closest('button')) return;
+    dragging=true;
+    const r=box.getBoundingClientRect();
+    sx=e.clientX; sy=e.clientY; ox=r.left; oy=r.top;
+    box.style.transform='none';
+    box.style.left=ox+'px'; box.style.top=oy+'px'; box.style.right='auto';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging) return;
+    box.style.left=(ox+e.clientX-sx)+'px';
+    box.style.top=(oy+e.clientY-sy)+'px';
+  });
+  document.addEventListener('mouseup',()=>{ dragging=false; });
+  drag.addEventListener('touchstart',e=>{
+    if(e.target.closest('button')) return;
+    const t=e.touches[0];
+    dragging=true;
+    const r=box.getBoundingClientRect();
+    sx=t.clientX; sy=t.clientY; ox=r.left; oy=r.top;
+    box.style.transform='none';
+    box.style.left=ox+'px'; box.style.top=oy+'px'; box.style.right='auto';
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!dragging) return;
+    const t=e.touches[0];
+    box.style.left=(ox+t.clientX-sx)+'px';
+    box.style.top=(oy+t.clientY-sy)+'px';
+  },{passive:true});
+  document.addEventListener('touchend',()=>{ dragging=false; });
+})();
 // 点行首那个标签就能改简称
 document.addEventListener('click',e=>{
   const c=e.target.closest('.spk'); if(!c) return;
@@ -1260,7 +1870,7 @@ btnDone.onclick=()=>{
   $('recBody').innerHTML = S.history.length
     ? S.history.map(r=>'<div class="rec">'
         +(spkVisible()&&r.spk?'<b style="color:'+spkColor(r.spk)+';font-weight:600">'
-           +esc(spkName(r.spk))+'</b> ':'')
+           +spkAvatar(r.spk)+' '+esc(spkName(r.spk))+'</b> ':'')
         +'<b>'+esc(r.src)+'</b><span>'+esc(r.dst)+'</span></div>').join('')
     : '<p style="color:#5E6E73">这次没有记录到内容。</p>';
   recSheet.classList.add('is-show');
@@ -1300,7 +1910,8 @@ window.addEventListener('pagehide',stopAll);
  * 音频链路本身不怕后台:AudioWorklet 在音频线程上跑,不受主线程降频影响。
  * 回到前台时做一次体检:AudioContext 被系统挂起就恢复,连接死了就重连。 */
 document.addEventListener('visibilitychange',()=>{
-  if(document.hidden) return;
+  console.log('[mic] 页面%s', document.hidden?'进入后台':'回到前台');
+  if(document.hidden){ mic && mic.kick(); return; }   // 切出去的一瞬间也做次体检
   if(!S.running || S.paused) return;
   mic && mic.kick();
   source && source.kick && source.kick();
@@ -1334,7 +1945,7 @@ const IOS = /iP(hone|ad|od)/.test(navigator.userAgent)
          || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);   // iPadOS 伪装成 Mac
 const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
 
-// 手机上没有画中画浮窗,把那个按钮整组藏掉,剩下的按钮铺满
+// 手机上没有画中画浮窗,把那个按钮整组藏掉,剩下的按钮铺满。
 if(!('documentPictureInPicture' in window)) document.body.classList.add('no-pip');
 
 if(window.isSecureContext && 'serviceWorker' in navigator){

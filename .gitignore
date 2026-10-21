@@ -7,3 +7,4 @@ package-lock.json
 cert.pem
 key.pem
 .DS_Store
+data/
