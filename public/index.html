@@ -1503,11 +1503,13 @@ function wire(s){
     } else SPK.feats.length=0;
     S.partial={src:'',dst:'',lang:'en'}; updateLangDir(); render();
   };
-  const dstBuf=[];
+  const dstBuf={en:[],zh:[]};
   s.onSrcFinal=f=>{
     const spk = f.spk!=null ? Number(f.spk)+1 : (Number(cfg.spk)?spkAssign():null);
-    const row={src:f.src||'',dst:'',spk,lang:f.lang||'en',pending:true,t:Date.now()};
-    if(dstBuf.length){ row.dst=dstBuf.shift(); row.pending=false; }
+    const lang=f.lang||'en';
+    const row={src:f.src||'',dst:'',spk,lang,pending:true,t:Date.now()};
+    const buf=dstBuf[lang];
+    if(buf && buf.length){ row.dst=buf.shift(); row.pending=false; }
     S.history.push(row);
     collectHist();
     if(f.lang) S.lastLang=f.lang;
@@ -1515,13 +1517,15 @@ function wire(s){
     S.partial={src:'',dst:'',lang:'en'}; updateLangDir(); render();
   };
   s.onDstFinal=f=>{
-    const i=S.history.findIndex(r=>r.pending);
+    const lang=f.lang||'zh';
+    const i=S.history.findIndex(r=>r.pending && (r.lang||'en')===lang);
     if(i>=0){
       S.history[i].dst=f.dst||'';
       S.history[i].pending=false;
     } else if(f.dst){
-      dstBuf.push(f.dst);
-      if(dstBuf.length>3) dstBuf.shift();
+      const b=dstBuf[lang]||(dstBuf[lang]=[]);
+      b.push(f.dst);
+      if(b.length>3) b.shift();
     }
     collectHist(); render();
   };
