@@ -1180,8 +1180,10 @@ let curTts=null;
 function pickTtsVoice(){
   try{
     const vs=speechSynthesis.getVoices()||[];
-    return vs.find(v=>/^en[-_]US/i.test(v.lang))
-        || vs.find(v=>/^en[-_]GB/i.test(v.lang))
+    const local=vs.filter(v=>v.localService);           // 本地语音离线可用
+    return local.find(v=>/^en/i.test(v.lang))            // 本地英文优先
+        || local[0]                                      // 退而求其次:本地中文语音读英文
+        || vs.find(v=>/^en[-_]US/i.test(v.lang))         // 在线英文兜底
         || vs.find(v=>/^en/i.test(v.lang))
         || vs.find(v=>v.default)
         || vs[0] || null;
