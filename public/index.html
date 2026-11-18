@@ -1176,10 +1176,9 @@ function renderFav(){
     b.onclick=e=>{ e.stopPropagation(); speakWord(b.dataset.word); };
   });
 }
+let curTts=null;
 function speakWord(word){
   if(!('speechSynthesis' in window)) return flash('当前浏览器不支持语音合成');
-  try{ speechSynthesis.cancel(); }catch(e){}
-  if(speechSynthesis.paused) speechSynthesis.resume();
   const u=new SpeechSynthesisUtterance(word);
   u.lang='en-US'; u.rate=1; u.volume=1;
   u.onerror=e=>{
@@ -1189,13 +1188,22 @@ function speakWord(word){
     console.error('TTS error',err||e);
     flash('发音失败：'+(err||'未知'));
   };
-  let spoken=false;
-  const trySpeak=()=>{ if(spoken) return; spoken=true; try{ speechSynthesis.speak(u); }catch(e){} };
-  if(speechSynthesis.getVoices().length===0){
-    speechSynthesis.onvoiceschanged=trySpeak;
-    setTimeout(trySpeak, 300);      // 有的浏览器不发 voiceschanged,兜底一次
+  curTts=u;   // 持住引用,避免被回收导致无声
+  const fire=()=>{
+    const busy=speechSynthesis.speaking||speechSynthesis.pending;
+    if(busy){ try{ speechSynthesis.cancel(); }catch(e){} }
+    try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){}
+    // Chrome 的坑:cancel() 后立刻 speak 会被吞掉(不发声也不报错),隔一拍再播
+    setTimeout(()=>{ try{ speechSynthesis.speak(u); }catch(e){} }, busy?150:0);
+  };
+  if(speechSynthesis.getVoices().length){
+    fire();
   }else{
-    trySpeak();
+    let done=false;
+    const once=()=>{ if(done) return; done=true; fire(); };
+    try{ speechSynthesis.addEventListener('voiceschanged', once, {once:true}); }
+    catch(e){ speechSynthesis.onvoiceschanged=once; }
+    setTimeout(once, 350);   // 有的浏览器不发 voiceschanged,兜底一次
   }
 }
 
