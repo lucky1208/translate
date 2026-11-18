@@ -386,6 +386,7 @@
     <div class="sheet__bar">
       <span class="sheet__title">设置</span>
       <div class="sheet__acts">
+        <button class="btn" id="setCancel">取消</button>
         <button class="btn" id="setClear">清空密钥</button>
         <button class="btn" id="setProbe">测试连接</button>
         <button class="btn btn--p" id="setSave">保存</button>
@@ -1768,6 +1769,11 @@ $('setSave').onclick=()=>{
   if(Number(cfg.spkMax)!==wasMax) spkReset();     // 改了人数上限,之前分的就不作数了
   if(S.running){ stopAll(); flash('设置已保存,重新点「开始」生效'); }
   else { setMeta(); render(); flash('已保存 · ' + PROVIDER_NAME[cfg.provider]); }
+};
+$('setCancel').onclick=()=>{
+  setSheet.classList.remove('is-show');
+  fillForm();                       // 丢弃未保存的改动,恢复成已保存的配置
+  try{ probeBox.className='probe'; probeBox.textContent=''; }catch(e){}
 };
 $('setClear').onclick=()=>{
   ['aliKey','aliVocab','vcApp','vcTok','arkKey'].forEach(k=>{ cfg[k]=''; F[k].value=''; });
