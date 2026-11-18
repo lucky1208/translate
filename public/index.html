@@ -1177,24 +1177,43 @@ function renderFav(){
   });
 }
 let curTts=null;
+function pickTtsVoice(){
+  try{
+    const vs=speechSynthesis.getVoices()||[];
+    return vs.find(v=>/^en[-_]US/i.test(v.lang))
+        || vs.find(v=>/^en[-_]GB/i.test(v.lang))
+        || vs.find(v=>/^en/i.test(v.lang))
+        || vs.find(v=>v.default)
+        || vs[0] || null;
+  }catch(e){ return null; }
+}
 function speakWord(word){
   if(!('speechSynthesis' in window)) return flash('当前浏览器不支持语音合成');
   const u=new SpeechSynthesisUtterance(word);
-  u.lang='en-US'; u.rate=1; u.volume=1;
+  const v=pickTtsVoice();
+  if(v) u.voice=v;
+  u.lang=(v&&v.lang)||'en-US';
+  u.rate=1; u.volume=1;
+  u.onstart=()=>console.log('[tts] start ·', word, '· voice:', v&&v.name, v&&v.lang);
+  u.onend=()=>console.log('[tts] end');
   u.onerror=e=>{
     const err=(e&&e.error)||'';
-    // 连点发音时会先 cancel 掉上一句,上一句会报 interrupted/canceled,这不是故障
     if(err==='interrupted'||err==='canceled') return;
-    console.error('TTS error',err||e);
+    console.error('[tts] error', err||e);
     flash('发音失败：'+(err||'未知'));
   };
-  curTts=u;   // 持住引用,避免被回收导致无声
+  curTts=u;
   const fire=()=>{
+    const voices=speechSynthesis.getVoices()||[];
+    console.log('[tts] voices:', voices.length, voices.map(x=>x.name+'('+x.lang+')').slice(0,6).join(', '));
+    if(!voices.length){
+      return flash('系统没有可用的语音声音<br>Windows:设置→时间和语言→语言→添加英语(美国)的语音包');
+    }
     const busy=speechSynthesis.speaking||speechSynthesis.pending;
     if(busy){ try{ speechSynthesis.cancel(); }catch(e){} }
     try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){}
     // Chrome 的坑:cancel() 后立刻 speak 会被吞掉(不发声也不报错),隔一拍再播
-    setTimeout(()=>{ try{ speechSynthesis.speak(u); }catch(e){} }, busy?150:0);
+    setTimeout(()=>{ try{ speechSynthesis.speak(u); }catch(e){ console.error('[tts] speak threw',e); } }, busy?150:0);
   };
   if(speechSynthesis.getVoices().length){
     fire();
