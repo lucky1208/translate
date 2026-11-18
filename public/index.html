@@ -1178,14 +1178,22 @@ function renderFav(){
 }
 function speakWord(word){
   if(!('speechSynthesis' in window)) return flash('当前浏览器不支持语音合成');
-  speechSynthesis.cancel();
+  try{ speechSynthesis.cancel(); }catch(e){}
   if(speechSynthesis.paused) speechSynthesis.resume();
   const u=new SpeechSynthesisUtterance(word);
   u.lang='en-US'; u.rate=1; u.volume=1;
-  u.onerror=e=>{ console.error('TTS error',e); flash('发音失败：'+e.error); };
-  const trySpeak=()=>{ speechSynthesis.speak(u); };
+  u.onerror=e=>{
+    const err=(e&&e.error)||'';
+    // 连点发音时会先 cancel 掉上一句,上一句会报 interrupted/canceled,这不是故障
+    if(err==='interrupted'||err==='canceled') return;
+    console.error('TTS error',err||e);
+    flash('发音失败：'+(err||'未知'));
+  };
+  let spoken=false;
+  const trySpeak=()=>{ if(spoken) return; spoken=true; try{ speechSynthesis.speak(u); }catch(e){} };
   if(speechSynthesis.getVoices().length===0){
     speechSynthesis.onvoiceschanged=trySpeak;
+    setTimeout(trySpeak, 300);      // 有的浏览器不发 voiceschanged,兜底一次
   }else{
     trySpeak();
   }
